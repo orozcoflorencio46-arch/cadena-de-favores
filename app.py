@@ -39,13 +39,6 @@ class SolicitudContacto(db.Model):
     solicitante = db.relationship('Usuario', backref='solicitudes_hechas')
     with app.app_context():
         db.create_all()
-# ----------------------------------------------------
-# RUTAS DE LA APLICACIÓN
-# ----------------------------------------------------
-@app.route('/')
-def inicio():
-  ...
-
 # -------------------------------------------------------------------
 # PLANTILLAS HTML EMBEBIDAS (Para ejecutar todo en un solo archivo)
 # -------------------------------------------------------------------

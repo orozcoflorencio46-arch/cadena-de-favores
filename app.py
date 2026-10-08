@@ -10,7 +10,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///plataforma_estudiantil.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
-
+with app.app_context():
 # -------------------------------------------------------------------
 # MODELOS DE BASE DE DATOS
 # -------------------------------------------------------------------

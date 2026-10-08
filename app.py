@@ -10,7 +10,6 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///plataforma_estudiantil.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
-with app.app_context():
 # -------------------------------------------------------------------
 # MODELOS DE BASE DE DATOS
 # -------------------------------------------------------------------
@@ -20,6 +19,7 @@ class Usuario(db.Model):
     correo = db.Column(db.String(100), unique=True, nullable=False)
     institucion = db.Column(db.String(100), nullable=False)
     contacto = db.Column(db.String(100), nullable=False)  # Teléfono / Telegram / Alias
+# ----------------------------------------------------
 
 class Publicacion(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -29,7 +29,6 @@ class Publicacion(db.Model):
     materia_area = db.Column(db.String(100), nullable=False)
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     usuario = db.relationship('Usuario', backref='publicaciones')
-
 class SolicitudContacto(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     publicacion_id = db.Column(db.Integer, db.ForeignKey('publicacion.id'), nullable=False)
@@ -38,6 +37,14 @@ class SolicitudContacto(db.Model):
 
     publicacion = db.relationship('Publicacion', backref='solicitudes')
     solicitante = db.relationship('Usuario', backref='solicitudes_hechas')
+    with app.app_context():
+        db.create_all()
+# ----------------------------------------------------
+# RUTAS DE LA APLICACIÓN
+# ----------------------------------------------------
+@app.route('/')
+def inicio():
+  ...
 
 # -------------------------------------------------------------------
 # PLANTILLAS HTML EMBEBIDAS (Para ejecutar todo en un solo archivo)

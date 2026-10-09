@@ -376,6 +376,16 @@ def solicitar_contacto(pub_id):
         db.session.add(solicitud)
         db.session.commit()
     return redirect(url_for('mis_solicitudes'))
+@app.route('/aceptar-solicitud/<int:sol_id>', methods=['POST'])
+def aceptar_solicitud(sol_id):
+    if 'usuario_id' not in session:
+        return redirect(url_for('registro'))
+        
+    solicitud = SolicitudContacto.query.get_or_404(sol_id)
+    solicitud.estado = 'aceptado'
+    db.session.commit()
+    
+    return redirect(url_for('mis_solicitudes'))
 
 @app.route('/marcar-brindado/<int:sol_id>', methods=['POST'])
 def marcar_brindado(sol_id):

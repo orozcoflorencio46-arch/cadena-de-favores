@@ -229,92 +229,76 @@ SOLICITUDES_TEMPLATE = BASE_TEMPLATE + """
 <h2 class="text-2xl font-bold mb-6">Centro de Comunicación Confidencial</h2>
 
 <div class="space-y-6">
-   <!-- Solicitudes Recibidas (Gente que quiere conectar contigo) -->
-<div class="bg-white p-5 rounded-lg shadow mb-6">
-  <h3 class="text-lg font-bold mb-3 border-b pb-2">Solicitudes Recibidas (Gente que quiere conectar contigo)</h3>
-  {% if recibidas %}
-    {% for sol in recibidas %}
-      <div class="p-3 border-b last:border-0 flex justify-between items-center">
-        <div>
-          <p class="font-medium text-sm">
-            Publicación: <strong>{{ sol.publicacion.titulo }}</strong>
-          </p>
-          <p class="text-xs text-gray-600">
-            Solicitante: <strong>{{ sol.solicitante.nombre }}</strong>
-          </p>
-          <p class="text-xs text-gray-500 mt-1">
-            Estado: <span class="font-bold text-amber-600">{{ sol.estado }}</span>
-          </p>
-        </div>
 
-        <div>
-          <!-- BOTÓN PARA ACEPTAR LA SOLICITUD -->
-          {% if sol.estado == 'pendiente' %}
-            <form action="/aceptar-solicitud/{{ sol.id }}" method="POST">
-              <button type="submit" class="text-xs bg-green-600 text-white px-3 py-1.5 rounded font-bold hover:bg-green-700">
-                Aceptar / Compartir Datos
-              </button>
-            </form>
-          {% elif sol.estado == 'brindado' %}
-            <form action="/validar-apoyo/{{ sol.id }}" method="POST">
-              <button type="submit" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded font-bold hover:bg-blue-700">
-                Validar Apoyo Recibido
-              </button>
-            </form>
-          {% else %}
-            <span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">Aceptado</span>
-          {% endif %}
+  <!-- 1. SOLICITUDES RECIBIDAS (Para el dueño de la publicación) -->
+  <div class="bg-white p-5 rounded-lg shadow">
+    <h3 class="text-lg font-bold mb-3 border-b pb-2">Solicitudes Recibidas (Gente que quiere conectar contigo)</h3>
+    {% if recibidas %}
+      {% for sol in recibidas %}
+        <div class="p-3 border-b last:border-0 flex justify-between items-center">
+          <div>
+            <p class="font-medium text-sm">Publicación: <strong>{{ sol.publicacion.titulo }}</strong></p>
+            <p class="text-xs text-gray-600">Solicitante: <strong>{{ sol.solicitante.nombre }}</strong></p>
+            <p class="text-xs text-gray-500 mt-1">Estado: <span class="font-bold text-amber-600">{{ sol.estado }}</span></p>
+          </div>
+          <div>
+            {% if sol.estado == 'pendiente' %}
+              <!-- El dueño AUTORIZA enviar sus datos de contacto -->
+              <form action="/aceptar-solicitud/{{ sol.id }}" method="POST">
+                <button type="submit" class="text-xs bg-green-600 text-white px-3 py-1.5 rounded font-bold hover:bg-green-700">
+                  Autorizar y Compartir Datos
+                </button>
+              </form>
+            {% elif sol.estado == 'brindado' %}
+              <!-- El dueño VALIDA que recibió el apoyo y cierra la publicación -->
+              <form action="/validar-apoyo/{{ sol.id }}" method="POST">
+                <button type="submit" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded font-bold hover:bg-blue-700">
+                  Validar Apoyo Recibido
+                </button>
+              </form>
+            {% elif sol.estado == 'aceptado' %}
+              <span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Esperando que el solicitante marque apoyo</span>
+            {% else %}
+              <span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">Completado</span>
+            {% endif %}
+          </div>
         </div>
-      </div>
-    {% endfor %}
-  {% else %}
-    <p class="text-sm text-gray-500">No tienes solicitudes pendientes.</p>
-  {% endif %}
-</div>
-          <!-- BOTÓN PARA ACEPTAR LA SOLICITUD -->
-          {% if sol.estado == 'pendiente' %}
-            <form action="/aceptar-solicitud/{{ sol.id }}" method="POST">
-              <button type="submit" class="text-xs bg-green-600 text-white px-3 py-1.5 rounded font-bold hover:bg-green-700">
-                Aceptar / Compartir Datos
-              </button>
-            </form>
-          {% elif sol.estado == 'brindado' %}
-            <!-- BOTÓN PARA VALIDAR CUANDO YA SE BRINDÓ EL FAVOR -->
-            <form action="/validar-apoyo/{{ sol.id }}" method="POST">
-              <button type="submit" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded font-bold hover:bg-blue-700">
-                Validar Apoyo Recibido
-              </button>
-            </form>
-          {% else %}
-            <span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">Aceptado</span>
-          {% endif %}
-        </div>
-      </div>
-    {% endfor %}
-  {% else %}
-    <p class="text-sm text-gray-500">No tienes solicitudes pendientes.</p>
-  {% endif %}
-</div>
+      {% endfor %}
+    {% else %}
+      <p class="text-sm text-gray-500">No tienes solicitudes pendientes.</p>
+    {% endif %}
+  </div>
 
-    <!-- Solicitudes Enviadas -->
-    <div class="bg-white p-5 rounded-lg shadow">
-        <h3 class="text-lg font-bold mb-3 border-b pb-2">Solicitudes Enviadas por ti</h3>
-        {% if enviadas %}
-            {% for sol in enviadas %}
-            <div class="p-3 border-b last:border-0">
-                <p class="font-medium text-sm">Publicación: <strong>{{ sol.publicacion.titulo }}</strong></p>
-                <p class="text-xs text-gray-500 mt-1">Estado: <span class="font-bold">{{ sol.estado }}</span></p>
-                {% if sol.estado == 'aceptado' %}
-                    <p class="text-xs text-green-700 bg-green-50 p-2 rounded mt-2">
-                        ✅ <strong>Contacto del dueño de la publicación ({{ sol.publicacion.usuario.nombre }}):</strong> {{ sol.publicacion.usuario.contacto }}
-                    </p>
-                {% endif %}
+  <!-- 2. SOLICITUDES ENVIADAS (Para quien solicitó la ayuda) -->
+  <div class="bg-white p-5 rounded-lg shadow">
+    <h3 class="text-lg font-bold mb-3 border-b pb-2">Solicitudes Enviadas por ti</h3>
+    {% if enviadas %}
+      {% for sol in enviadas %}
+        <div class="p-3 border-b last:border-0">
+          <p class="font-medium text-sm">Publicación: <strong>{{ sol.publicacion.titulo }}</strong></p>
+          <p class="text-xs text-gray-500 mt-1">Estado: <span class="font-bold">{{ sol.estado }}</span></p>
+
+          {% if sol.estado == 'aceptado' %}
+            <!-- Se REVELAN los datos de contacto únicamente cuando el dueño autorizó -->
+            <div class="mt-2 p-3 bg-green-50 rounded border border-green-200">
+              <p class="text-xs text-green-800 font-bold mb-1">✅ ¡Contacto Autorizado!</p>
+              <p class="text-xs text-gray-700"><strong>Nombre:</strong> {{ sol.publicacion.usuario.nombre }}</p>
+              <p class="text-xs text-gray-700"><strong>Contacto:</strong> {{ sol.publicacion.usuario.contacto }}</p>
+              
+              <form action="/marcar-brindado/{{ sol.id }}" method="POST" class="mt-2">
+                <button type="submit" class="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
+                  Marcar como Apoyo Brindado
+                </button>
+              </form>
             </div>
-            {% endfor %}
-        {% else %}
-            <p class="text-sm text-gray-500">No has enviado ninguna solicitud aún.</p>
-        {% endif %}
-    </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <p class="text-sm text-gray-500">No has enviado ninguna solicitud aún.</p>
+    {% endif %}
+  </div>
+
 </div>
 """
 

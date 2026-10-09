@@ -395,7 +395,6 @@ def solicitar_contacto(pub_id):
             )
             db.session.add(nueva_solicitud)
             db.session.commit()
-            
     return redirect(url_for('mis_solicitudes'))
 
 
@@ -472,6 +471,5 @@ def logout():
 # -----------------------------------------------------------------------------
 with app.app_context():
     db.create_all()
-
 if __name__ == '_main_':
  app.run(debug=True, host='0.0.0.0', port=5000)

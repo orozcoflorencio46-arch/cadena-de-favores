@@ -229,7 +229,7 @@ SOLICITUDES_TEMPLATE = BASE_TEMPLATE + """
 <h2 class="text-2xl font-bold mb-6">Centro de Comunicación Confidencial</h2>
 
 <div class="space-y-6">
-    <!-- Solicitudes Recibidas (Gente que quiere conectar contigo) -->
+   <!-- Solicitudes Recibidas (Gente que quiere conectar contigo) -->
 <div class="bg-white p-5 rounded-lg shadow mb-6">
   <h3 class="text-lg font-bold mb-3 border-b pb-2">Solicitudes Recibidas (Gente que quiere conectar contigo)</h3>
   {% if recibidas %}
@@ -248,6 +248,29 @@ SOLICITUDES_TEMPLATE = BASE_TEMPLATE + """
         </div>
 
         <div>
+          <!-- BOTÓN PARA ACEPTAR LA SOLICITUD -->
+          {% if sol.estado == 'pendiente' %}
+            <form action="/aceptar-solicitud/{{ sol.id }}" method="POST">
+              <button type="submit" class="text-xs bg-green-600 text-white px-3 py-1.5 rounded font-bold hover:bg-green-700">
+                Aceptar / Compartir Datos
+              </button>
+            </form>
+          {% elif sol.estado == 'brindado' %}
+            <form action="/validar-apoyo/{{ sol.id }}" method="POST">
+              <button type="submit" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded font-bold hover:bg-blue-700">
+                Validar Apoyo Recibido
+              </button>
+            </form>
+          {% else %}
+            <span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">Aceptado</span>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="text-sm text-gray-500">No tienes solicitudes pendientes.</p>
+  {% endif %}
+</div>
           <!-- BOTÓN PARA ACEPTAR LA SOLICITUD -->
           {% if sol.estado == 'pendiente' %}
             <form action="/aceptar-solicitud/{{ sol.id }}" method="POST">

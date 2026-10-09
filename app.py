@@ -371,91 +371,82 @@ def nueva_publicacion():
 
     return render_template_string(NUEVA_PUB_TEMPLATE)
 
+# --- 1. RUTA PARA SOLICITAR CONTACTO ---
 @app.route('/solicitar-contacto/<int:pub_id>', methods=['POST'])
 def solicitar_contacto(pub_id):
-    db.create_all()
     if 'usuario_id' not in session:
         return redirect(url_for('registro'))
+        
+    usuario_actual_id = session['usuario_id']
+    publicacion = Publicacion.query.get_or_404(pub_id)
     
-    existe = SolicitudContacto.query.filter_by(publicacion_id=pub_id, solicitante_id=session['usuario_id']).first()
-    if not existe:
-        solicitud = SolicitudContacto(publicacion_id=pub_id, solicitante_id=session['usuario_id'])
-        db.session.add(solicitud)
-        db.session.commit()
+    # Evitar que el dueño de la publicación se solicite contacto a sí mismo
+    if publicacion.usuario_id != usuario_actual_id:
+        existe = SolicitudContacto.query.filter_by(
+            publicacion_id=pub_id, 
+            solicitante_id=usuario_actual_id
+        ).first()
+        
+        if not existe:
+            nueva_solicitud = SolicitudContacto(
+                publicacion_id=pub_id,
+                solicitante_id=usuario_actual_id,
+                estado='pendiente'
+            )
+            db.session.add(nueva_solicitud)
+            db.session.commit()
+            
     return redirect(url_for('mis_solicitudes'))
+
+
+# --- 2. RUTA PARA QUE EL DUEÑO AUTORICE Y COMPARTA SUS DATOS ---
 @app.route('/aceptar-solicitud/<int:sol_id>', methods=['POST'])
 def aceptar_solicitud(sol_id):
     if 'usuario_id' not in session:
         return redirect(url_for('registro'))
         
     solicitud = SolicitudContacto.query.get_or_404(sol_id)
-    solicitud.estado = 'aceptado'
-    db.session.commit()
     
+    # Solo el dueño de la publicación puede autorizar compartir sus datos
+    if solicitud.publicacion.usuario_id == session['usuario_id']:
+        solicitud.estado = 'aceptado'
+        db.session.commit()
+        
     return redirect(url_for('mis_solicitudes'))
 
+
+# --- 3. RUTA PARA QUE EL SOLICITANTE MARQUE COMO BRINDADO ---
 @app.route('/marcar-brindado/<int:sol_id>', methods=['POST'])
 def marcar_brindado(sol_id):
+    if 'usuario_id' not in session:
+        return redirect(url_for('registro'))
+        
     solicitud = SolicitudContacto.query.get_or_404(sol_id)
-    if 'usuario_id' in session:
+    
+    # Solo el solicitante puede marcar que el favor ya le fue brindado
+    if solicitud.solicitante_id == session['usuario_id']:
         solicitud.estado = 'brindado'
         db.session.commit()
+        
     return redirect(url_for('mis_solicitudes'))
 
+
+# --- 4. RUTA PARA QUE EL DUEÑO VALIDE EL APOYO Y CIERRE LA PUBLICACIÓN ---
 @app.route('/validar-apoyo/<int:sol_id>', methods=['POST'])
 def validar_apoyo(sol_id):
+    if 'usuario_id' not in session:
+        return redirect(url_for('registro'))
+        
     solicitud = SolicitudContacto.query.get_or_404(sol_id)
-    if 'usuario_id' in session:
-        solicitud.estado = 'completado'
-        solicitud.publicacion.estado = 'completada'  
-        db.session.commit()
-    return redirect(url_for('mis_solicitudes'))
-@app.route('/mis-solicitudes')
-def mis_solicitudes():
-    # --- 1. VERIFICACIÓN DE SESIÓN (SEGURIDAD) ---
-    # Si el usuario no está logueado, lo mandamos al registro
-    if 'usuario_id' not in session:
-        return redirect(url_for('registro'))
-
-    # --- 2. OBTENCIÓN DE DATOS DEL USUARIO ---
-    # Obtenemos el ID del usuario actual de la sesión
-    usuario_id = session['usuario_id']
-
-    # --- 3. CONSULTAS A LA BASE DE DATOS (CON FILTROS) ---
-
-    # A. Solicitudes recibidas (para mis publicaciones) que NO están completadas
-    # Usamos .join(Publicacion) para conectar la solicitud con la publicación
-    recibidas = SolicitudContacto.query.join(Publicacion).filter(
-        Publicacion.usuario_id == usuario_id,         # Publicaciones que me pertenecen
-        SolicitudContacto.estado != 'completado'      # Ocultar las que ya están completadas
-    ).all()
-
-    # B. Solicitudes que yo envié que NO están completadas
-    enviadas = SolicitudContacto.query.filter(
-        SolicitudContacto.solicitante_id == usuario_id, # Solicitudes que yo hice
-        SolicitudContacto.estado != 'completado'       # Ocultar las que ya están completadas
-    ).all()
-
-    # --- 4. RENDERIZADO DE LA PLANTILLA ---
-    # Pasamos los resultados a la plantilla HTML
-    return render_template_string(
-        SOLICITUDES_TEMPLATE, 
-        recibidas=recibidas, 
-        enviadas=enviadas
-    )
-@app.route('/responder-solicitud/<int:sol_id>/<accion>')
-def responder_solicitud(sol_id, accion):
-    if 'usuario_id' not in session:
-        return redirect(url_for('registro'))
     
-    sol = SolicitudContacto.query.get_or_404(sol_id)
-    if sol.publicacion.usuario_id == session['usuario_id']:
-        if accion == 'aceptar':
-            sol.estado = 'aceptado'
-        elif accion == 'rechazar':
-            sol.estado = 'rechazado'
+    # Solo el dueño valida el apoyo recibido y finaliza la publicación
+    if solicitud.publicacion.usuario_id == session['usuario_id']:
+        solicitud.estado = 'completado'
+        solicitud.publicacion.estado = 'completada'  # Se oculta del muro principal
         db.session.commit()
+        
     return redirect(url_for('mis_solicitudes'))
+ 
 
 @app.route('/qr')
 def generar_qr():

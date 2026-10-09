@@ -268,13 +268,21 @@ SOLICITUDES_TEMPLATE = BASE_TEMPLATE + """
         {% endif %}
 
     {% elif sol.estado == 'completado' %}
-        <span class="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded border border-green-200">
-            ✓ Favor Completado y Validado
-        </span>
-        {% else %}
-   <span class="text-xs font-bold uppercase text-gray-500">{{ sol.estado }}</span>
+    <span class="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded border border-green-200">
+        ✓ Favor Completado y Validado
+    </span>
+
+{% else %}
+    <span class="text-xs font-bold uppercase text-gray-500">{{ sol.estado }}</span>
 {% endif %}
+
+        </div>
     </div>
+{% endfor %}
+{% else %}
+    <p class="text-sm text-gray-500">No tienes solicitudes pendientes.</p>
+{% endif %}
+</div>
 
     <!-- Solicitudes Enviadas -->
     <div class="bg-white p-5 rounded-lg shadow">

@@ -400,23 +400,42 @@ def validar_apoyo(sol_id):
     solicitud = SolicitudContacto.query.get_or_404(sol_id)
     if 'usuario_id' in session:
         solicitud.estado = 'completado'
-        solicitud.publicacion.estado = 'completada'
+        solicitud.publicacion.estado = 'completada'  
         db.session.commit()
     return redirect(url_for('mis_solicitudes'))
 @app.route('/mis-solicitudes')
 def mis_solicitudes():
+    # --- 1. VERIFICACIÓN DE SESIÓN (SEGURIDAD) ---
+    # Si el usuario no está logueado, lo mandamos al registro
     if 'usuario_id' not in session:
         return redirect(url_for('registro'))
-    
+
+    # --- 2. OBTENCIÓN DE DATOS DEL USUARIO ---
+    # Obtenemos el ID del usuario actual de la sesión
     usuario_id = session['usuario_id']
-    
-    # Solicitudes sobre mis publicaciones
-    recibidas = SolicitudContacto.query.join(Publicacion).filter(Publicacion.usuario_id == usuario_id).all()
-    # Solicitudes que yo envié
-    enviadas = SolicitudContacto.query.filter_by(solicitante_id=usuario_id).all()
 
-    return render_template_string(SOLICITUDES_TEMPLATE, recibidas=recibidas, enviadas=enviadas)
+    # --- 3. CONSULTAS A LA BASE DE DATOS (CON FILTROS) ---
 
+    # A. Solicitudes recibidas (para mis publicaciones) que NO están completadas
+    # Usamos .join(Publicacion) para conectar la solicitud con la publicación
+    recibidas = SolicitudContacto.query.join(Publicacion).filter(
+        Publicacion.usuario_id == usuario_id,         # Publicaciones que me pertenecen
+        SolicitudContacto.estado != 'completado'      # Ocultar las que ya están completadas
+    ).all()
+
+    # B. Solicitudes que yo envié que NO están completadas
+    enviadas = SolicitudContacto.query.filter(
+        SolicitudContacto.solicitante_id == usuario_id, # Solicitudes que yo hice
+        SolicitudContacto.estado != 'completado'       # Ocultar las que ya están completadas
+    ).all()
+
+    # --- 4. RENDERIZADO DE LA PLANTILLA ---
+    # Pasamos los resultados a la plantilla HTML
+    return render_template_string(
+        SOLICITUDES_TEMPLATE, 
+        recibidas=recibidas, 
+        enviadas=enviadas
+    )
 @app.route('/responder-solicitud/<int:sol_id>/<accion>')
 def responder_solicitud(sol_id, accion):
     if 'usuario_id' not in session:

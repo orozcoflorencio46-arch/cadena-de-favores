@@ -27,6 +27,7 @@ class Publicacion(db.Model):
     titulo = db.Column(db.String(150), nullable=False)
     descripcion = db.Column(db.Text, nullable=False)
     materia_area = db.Column(db.String(100), nullable=False)
+    estado = db.Column(db.String(20), default ='activa')# 'activa', 'en_proceso', 'completada' 
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     usuario = db.relationship('Usuario', backref='publicaciones')
 class SolicitudContacto(db.Model):
@@ -246,15 +247,33 @@ SOLICITUDES_TEMPLATE = BASE_TEMPLATE + """
                     {% if sol.estado == 'pendiente' %}
                         <a href="{{ url_for('responder_solicitud', sol_id=sol.id, accion='aceptar') }}" class="bg-green-600 text-white px-3 py-1 rounded text-xs mr-2">Aceptar y Compartir Datos</a>
                         <a href="{{ url_for('responder_solicitud', sol_id=sol.id, accion='rechazar') }}" class="bg-gray-400 text-white px-3 py-1 rounded text-xs">Rechazar</a>
-                    {% else %}
-                        <span class="text-xs font-bold uppercase text-gray-500">{{ sol.estado }}</span>
-                    {% endif %}
-                </div>
-            </div>
-            {% endfor %}
+                   {% elif sol.estado == 'aceptado' %}
+        <form action="{{ url_for('marcar_brindado', sol_id=sol.id) }}" method="POST" class="inline">
+            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold py-1 px-3 rounded shadow">
+                Marcar Apoyo Brindado
+            </button>
+        </form>
+
+    {% elif sol.estado == 'brindado' %}
+        {% if session['usuario_id'] == sol.publicacion.usuario_id %}
+            <form action="{{ url_for('validar_apoyo', sol_id=sol.id) }}" method="POST" class="inline">
+                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-1 px-3 rounded shadow">
+                    ✓ Validar Apoyo Recibido
+                </button>
+            </form>
         {% else %}
-            <p class="text-sm text-gray-500">No tienes solicitudes pendientes.</p>
+            <span class="text-xs font-bold text-blue-500 bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                ⏳ Esperando confirmación
+            </span>
         {% endif %}
+
+    {% elif sol.estado == 'completado' %}
+        <span class="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded border border-green-200">
+            ✓ Favor Completado y Validado
+        </span>
+        {% else %}
+   <span class="text-xs font-bold uppercase text-gray-500">{{ sol.estado }}</span>
+{% endif %}
     </div>
 
     <!-- Solicitudes Enviadas -->
@@ -360,6 +379,22 @@ def solicitar_contacto(pub_id):
         db.session.commit()
     return redirect(url_for('mis_solicitudes'))
 
+@app.route('/marcar-brindado/<int:sol_id>', methods=['POST'])
+def marcar_brindado(sol_id):
+    solicitud = SolicitudContacto.query.get_or_404(sol_id)
+    if 'usuario_id' in session:
+        solicitud.estado = 'brindado'
+        db.session.commit()
+    return redirect(url_for('mis_solicitudes'))
+
+@app.route('/validar-apoyo/<int:sol_id>', methods=['POST'])
+def validar_apoyo(sol_id):
+    solicitud = SolicitudContacto.query.get_or_404(sol_id)
+    if 'usuario_id' in session:
+        solicitud.estado = 'completado'
+        solicitud.publicacion.estado = 'completada'
+        db.session.commit()
+    return redirect(url_for('mis_solicitudes'))
 @app.route('/mis-solicitudes')
 def mis_solicitudes():
     if 'usuario_id' not in session:

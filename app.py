@@ -349,7 +349,7 @@ def nueva_publicacion():
 
 @app.route('/solicitar-contacto/<int:pub_id>', methods=['POST'])
 def solicitar_contacto(pub_id):
-    db.create_()
+    db.create_all()
     if 'usuario_id' not in session:
         return redirect(url_for('registro'))
     

@@ -6,7 +6,7 @@ import os
 
 app = Flask(__name__)
 app.secret_key = "clave_secreta_para_sesiones_estudiantiles"
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///cadena_v2.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///cadena_v3.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)

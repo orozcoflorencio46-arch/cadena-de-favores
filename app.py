@@ -348,7 +348,7 @@ def registro():
 def muro():
     if 'usuario_id' not in session:
         return redirect(url_for('registro'))
-    publicaciones = Publicacion.query.order_by(Publicacion.id.desc()).all()
+    publicaciones = Publicacion.query.filter(Publicacion.estado!= 'completada').order_by(Publicacion.id.desc()).all()
     return render_template_string(MURO_TEMPLATE, publicaciones=publicaciones)
 
 @app.route('/nueva-publicacion', methods=['GET', 'POST'])

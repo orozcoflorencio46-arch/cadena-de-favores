@@ -445,7 +445,32 @@ def validar_apoyo(sol_id):
         db.session.commit()
         
     return redirect(url_for('mis_solicitudes'))
- 
+
+ # --- 5. RUTA PARA MOSTRAR LA VISTA DE MIS SOLICITUDES ---
+@app.route('/mis-solicitudes')
+def mis_solicitudes():
+    if 'usuario_id' not in session:
+        return redirect(url_for('registro'))
+        
+    usuario_id = session['usuario_id']
+    
+    # Solicitudes que me han hecho a mí
+    recibidas = SolicitudContacto.query.join(Publicacion).filter(
+        Publicacion.usuario_id == usuario_id,
+        SolicitudContacto.estado != 'completado'
+    ).all()
+    
+    # Solicitudes que yo he realizado a otros
+    enviadas = SolicitudContacto.query.filter(
+        SolicitudContacto.solicitante_id == usuario_id,
+        SolicitudContacto.estado != 'completado'
+    ).all()
+    
+    return render_template_string(
+        SOLICITUDES_TEMPLATE, 
+        recibidas=recibidas, 
+        enviadas=enviadas
+    )
 
 @app.route('/qr')
 def generar_qr():

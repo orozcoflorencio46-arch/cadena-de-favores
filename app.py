@@ -342,7 +342,7 @@ def registro():
         correo = request.form['correo']
         institucion = request.form['institucion']
         contacto = request.form['contacto']
-
+    
         usuario = Usuario.query.filter_by(correo=correo).first()
         if not usuario:
             usuario = Usuario(nombre=nombre, correo=correo, institucion=institucion, contacto=contacto)

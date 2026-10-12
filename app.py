@@ -768,6 +768,10 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
     <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 8 4.03 8z" />
   </svg>
   <span class="text-sm font-semibold">Mis Solicitudes</span>
+<!-- 🔴 INDICADOR ROJO DE NOTIFICACIONES NUEVAS (Inicia oculto con d-none) -->
+    <span id="badge-notif" class="position-absolute top-0 start-100 translate-middle p-2 bg-red-500 border border-white rounded-circle d-none" style="width: 14px; height: 14px; display: inline-block;">
+        <span class="visually-hidden">Nuevas solicitudes</span>
+    </span>
 </a>
 """
 
@@ -874,6 +878,33 @@ SOLICITUDES_TEMPLATE = BASE_TEMPLATE + """
   </div>
 
 </div>
+<script>
+async function chequearNuevasSolicitudes() {
+    try {
+        const respuesta = await fetch('/api/verificar-nuevas-solicitudes');
+        if (!respuesta.ok) return;
+
+        const data = await respuesta.json();
+        const badge = document.getElementById('badge-notif');
+
+        if (data.tiene_nuevas) {
+            // Muestra el punto rojo si hay solicitudes nuevas
+            badge.classList.remove('d-none');
+        } else {
+            // Oculta el punto rojo si no hay nada pendiente
+            badge.classList.add('d-none');
+        }
+    } catch (error) {
+        console.error('Error al verificar solicitudes:', error);
+    }
+}
+
+// ⏱️ Revisa automáticamente cada 6 segundos en segundo plano
+setInterval(chequearNuevasSolicitudes, 6000);
+
+// Ejecutar una vez al cargar la página
+chequearNuevasSolicitudes();
+</script>
 """
 
 QR_TEMPLATE = BASE_TEMPLATE + """
@@ -893,6 +924,21 @@ def inicio():
     if 'usuario_id' in session:
         return redirect(url_for('muro'))
     return render_template_string(REGISTRO_TEMPLATE)
+
+from flask import jsonify
+
+@app.route('/api/verificar-nuevas-solicitudes')
+def verificar_nuevas_solicitudes():
+    if 'user_id' not in session:
+        return jsonify({"tiene_nuevas": False})
+
+    # Cuenta cuántas solicitudes pendientes tiene el usuario actual
+    # (Asegúrate de cambiar 'Solicitud' y 'usuario_id' si tus nombres en la base de datos son distintos)
+    cantidad_nuevas = Solicitud.query.filter_by(usuario_id=session['user_id'], estado='pendiente').count()
+
+    return jsonify({
+        "tiene_nuevas": cantidad_nuevas > 0
+    })
 
 @app.route('/registro', methods=['GET', 'POST'])
 def registro():

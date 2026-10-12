@@ -1,4 +1,4 @@
-from flask import Flask, render_template_string, request, redirect, url_for, session, send_file
+from flask import Flask, render_template_string, request, redirect, url_for, session,jsonify,send_file
 from flask_sqlalchemy import SQLAlchemy
 import qrcode
 import io

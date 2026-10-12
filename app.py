@@ -556,14 +556,13 @@ def logout():
 with app.app_context():
     db.create_all()
 if __name__ == '_main_':
-=======
 from flask import Flask, render_template_string, request, redirect, url_for, session, send_file
 from flask_sqlalchemy import SQLAlchemy
 import qrcode
 import io
 import os
 
-app = Flask(__name__)
+app = Flask(__name__) 
 app.secret_key = "clave_secreta_para_sesiones_estudiantiles"
 import os
 

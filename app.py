@@ -260,11 +260,9 @@ function verificarEstadoProceso() {
 }
 
 // Consultar cada 10 segundos
-setInterval(verificarEstadoProceso, 10000);
-
 // Consultar al cargar la página
 document.addEventListener('DOMContentLoaded', verificarEstadoProceso);
-</script
+</script>
 """
 
 NUEVA_PUB_TEMPLATE = BASE_TEMPLATE + """
@@ -397,6 +395,8 @@ setInterval(chequearNuevasSolicitudes, 6000);
 // Ejecutar una vez al cargar la página
 chequearNuevasSolicitudes();
 </script>
+</body>
+</html>
 """
 
 QR_TEMPLATE = BASE_TEMPLATE + """

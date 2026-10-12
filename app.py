@@ -212,56 +212,53 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
     </span>
 </a>
 
-<!-- Elemento de audio -->
+<!-- Elemento de audio con un tono claro y corto -->
 <audio id="tono-notificacion" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
 <script>
-let cantidadAnterior = -1;
-let historialAnterior = -1;
-let esPrimeraCarga = true;
+// Variable para recordar la cantidad anterior
+let cantidadAnterior = 0;
+let primerCarga = true;
 
-function verificarEstadoProceso() {
+function actualizarContadorNotificaciones() {
     fetch('/api/verificar-nuevas-solicitudes')
         .then(response => response.json())
         .then(data => {
             const badge = document.getElementById('badge-contador');
             const tono = document.getElementById('tono-notificacion');
-            
-            const cantidadActual = data.cantidad || 0;
-            const historialActual = data.total_historial || 0;
+            const cantidadNueva = data.cantidad || 0;
 
-            // Actualizar la interfaz del badge numérico
             if (badge) {
-                if (cantidadActual > 0) {
-                    badge.textContent = cantidadActual;
+                if (cantidadNueva > 0) {
+                    badge.textContent = cantidadNueva;
                     badge.classList.remove('hidden');
                 } else {
                     badge.classList.add('hidden');
                 }
             }
 
-            // Detectar si hubo cambios en el proceso (Nueva solicitud o cierre/cambio de favor)
-            if (!esPrimeraCarga) {
-                if (cantidadActual > cantidadAnterior || historialActual !== historialAnterior) {
-                    if (tono) {
-                        tono.play().catch(error => {
-                            console.log("Reproducción de audio bloqueada por el navegador hasta interactuar:", error);
-                        });
-                    }
+            // Si llegaron NUEVAS solicitudes (la cantidad aumentó)
+            if (cantidadNueva > cantidadAnterior && !primerCarga) {
+                if (tono) {
+                    tono.play().catch(error => {
+                        // Los navegadores bloquean el sonido si el usuario no ha interactuado aún con la página
+                        console.log("El navegador bloqueó la reproducción automática del audio:", error);
+                    });
                 }
             }
 
-            // Guardar estados actuales para la siguiente verificación
-            cantidadAnterior = cantidadActual;
-            historialAnterior = historialActual;
-            esPrimeraCarga = false;
+            // Actualizamos el estado
+            cantidadAnterior = cantidadNueva;
+            primerCarga = false;
         })
-        .catch(error => console.error('Error al verificar el estado del proceso:', error));
+        .catch(error => console.error('Error al obtener notificaciones:', error));
 }
 
 // Consultar cada 10 segundos
+setInterval(actualizarContadorNotificaciones, 10000);
+
 // Consultar al cargar la página
-document.addEventListener('DOMContentLoaded', verificarEstadoProceso);
+document.addEventListener('DOMContentLoaded', actualizarContadorNotificaciones);
 </script>
 """
 

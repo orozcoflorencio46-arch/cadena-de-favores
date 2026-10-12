@@ -212,54 +212,59 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
     </span>
 </a>
 
-<!-- Elemento de audio con un tono claro y corto -->
+<!-- Elemento de audio -->
 <audio id="tono-notificacion" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
 <script>
-// Variable para recordar la cantidad anterior
-let cantidadAnterior = 0;
-let primerCarga = true;
+let cantidadAnterior = -1;
+let historialAnterior = -1;
+let esPrimeraCarga = true;
 
-function actualizarContadorNotificaciones() {
+function verificarEstadoProceso() {
     fetch('/api/verificar-nuevas-solicitudes')
         .then(response => response.json())
         .then(data => {
             const badge = document.getElementById('badge-contador');
             const tono = document.getElementById('tono-notificacion');
-            const cantidadNueva = data.cantidad || 0;
+            
+            const cantidadActual = data.cantidad || 0;
+            const historialActual = data.total_historial || 0;
 
+            // Actualizar la interfaz del badge numérico
             if (badge) {
-                if (cantidadNueva > 0) {
-                    badge.textContent = cantidadNueva;
+                if (cantidadActual > 0) {
+                    badge.textContent = cantidadActual;
                     badge.classList.remove('hidden');
                 } else {
                     badge.classList.add('hidden');
                 }
             }
 
-            // Si llegaron NUEVAS solicitudes (la cantidad aumentó)
-            if (cantidadNueva > cantidadAnterior && !primerCarga) {
-                if (tono) {
-                    tono.play().catch(error => {
-                        // Los navegadores bloquean el sonido si el usuario no ha interactuado aún con la página
-                        console.log("El navegador bloqueó la reproducción automática del audio:", error);
-                    });
+            // Detectar si hubo cambios en el proceso (Nueva solicitud o cierre/cambio de favor)
+            if (!esPrimeraCarga) {
+                if (cantidadActual > cantidadAnterior || historialActual !== historialAnterior) {
+                    if (tono) {
+                        tono.play().catch(error => {
+                            console.log("Reproducción de audio bloqueada por el navegador hasta interactuar:", error);
+                        });
+                    }
                 }
             }
 
-            // Actualizamos el estado
-            cantidadAnterior = cantidadNueva;
-            primerCarga = false;
+            // Guardar estados actuales para la siguiente verificación
+            cantidadAnterior = cantidadActual;
+            historialAnterior = historialActual;
+            esPrimeraCarga = false;
         })
-        .catch(error => console.error('Error al obtener notificaciones:', error));
+        .catch(error => console.error('Error al verificar el estado del proceso:', error));
 }
 
 // Consultar cada 10 segundos
-setInterval(actualizarContadorNotificaciones, 10000);
+setInterval(verificarEstadoProceso, 10000);
 
 // Consultar al cargar la página
-document.addEventListener('DOMContentLoaded', actualizarContadorNotificaciones);
-</script>
+document.addEventListener('DOMContentLoaded', verificarEstadoProceso);
+</script
 """
 
 NUEVA_PUB_TEMPLATE = BASE_TEMPLATE + """
@@ -415,18 +420,24 @@ def inicio():
 @app.route('/api/verificar-nuevas-solicitudes')
 def verificar_nuevas_solicitudes():
     if 'usuario_id' not in session:
-        return jsonify({"cantidad": 0})
+        return jsonify({"cantidad": 0, "total_historial": 0})
 
     usuario_id = session['usuario_id']
     
-    # Contamos cuántas solicitudes dirigidas a ti NO están completadas
-    cantidad_nuevas = SolicitudContacto.query.join(Publicacion).filter(
+    # Solicitudes pendientes (nuevas o en proceso)
+    pendientes = SolicitudContacto.query.join(Publicacion).filter(
         Publicacion.usuario_id == usuario_id,
         SolicitudContacto.estado != 'completado'
     ).count()
 
+    # Total de solicitudes para llevar control de cambios (incluyendo cerradas/completadas)
+    total_historial = SolicitudContacto.query.join(Publicacion).filter(
+        Publicacion.usuario_id == usuario_id
+    ).count()
+
     return jsonify({
-        "cantidad": cantidad_nuevas
+        "cantidad": pendientes,
+        "total_historial": total_historial
     })
 
 @app.route('/registro', methods=['GET', 'POST'])

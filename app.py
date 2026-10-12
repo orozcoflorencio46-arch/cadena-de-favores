@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 from flask import Flask, render_template_string, request, redirect, url_for, session, send_file
 from flask_sqlalchemy import SQLAlchemy
 import qrcode
@@ -1028,5 +1027,4 @@ def logout():
 with app.app_context():
     db.create_all()
 if __name__ == '_main_':
->>>>>>> ad7b20e5dfb882912c76212c81c6db1739dbe318
  app.run(debug=True, host='0.0.0.0', port=5000)

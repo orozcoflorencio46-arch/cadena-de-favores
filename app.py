@@ -201,19 +201,65 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
         <p class="text-gray-500 col-span-2 text-center py-8">No hay publicaciones todavía. ¡Sé el primero en publicar!</p>
     {% endfor %}
 </div>
-<!-- BOTÓN FLOTANTE MIS SOLICITUDES -->
-<a href="/mis-solicitudes" 
-   class="fixed bottom-6 right-6 z-50 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-5 rounded-full shadow-2xl flex items-center gap-2 transition-all duration-300 transform hover:scale-105 active:scale-95 border border-indigo-400/30">
-  <!-- Ícono opcional SVG (Mensajes / Solicitudes) -->
-  <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-    <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 8 4.03 8z" />
-  </svg>
-  <span class="text-sm font-semibold">Mis Solicitudes</span>
-<!-- 🔴 INDICADOR ROJO DE NOTIFICACIONES NUEVAS (Inicia oculto con d-none) -->
-    <span id="badge-notif" class="position-absolute top-0 start-100 translate-middle p-2 bg-red-500 border border-white rounded-circle d-none" style="width: 14px; height: 14px; display: inline-block;">
-        <span class="visually-hidden">Nuevas solicitudes</span>
+
+<!-- HTML de tu botón corregido -->
+<a href="/mis-solicitudes" class="relative inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition">
+    Mis Solicitudes
+    
+    <!-- Badge numérico con clases completas -->
+    <span id="badge-contador" class="hidden absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
+        0
     </span>
 </a>
+
+<!-- Elemento de audio con un tono claro y corto -->
+<audio id="tono-notificacion" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
+
+<script>
+// Variable para recordar la cantidad anterior
+let cantidadAnterior = 0;
+let primerCarga = true;
+
+function actualizarContadorNotificaciones() {
+    fetch('/api/verificar-nuevas-solicitudes')
+        .then(response => response.json())
+        .then(data => {
+            const badge = document.getElementById('badge-contador');
+            const tono = document.getElementById('tono-notificacion');
+            const cantidadNueva = data.cantidad || 0;
+
+            if (badge) {
+                if (cantidadNueva > 0) {
+                    badge.textContent = cantidadNueva;
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+            }
+
+            // Si llegaron NUEVAS solicitudes (la cantidad aumentó)
+            if (cantidadNueva > cantidadAnterior && !primerCarga) {
+                if (tono) {
+                    tono.play().catch(error => {
+                        // Los navegadores bloquean el sonido si el usuario no ha interactuado aún con la página
+                        console.log("El navegador bloqueó la reproducción automática del audio:", error);
+                    });
+                }
+            }
+
+            // Actualizamos el estado
+            cantidadAnterior = cantidadNueva;
+            primerCarga = false;
+        })
+        .catch(error => console.error('Error al obtener notificaciones:', error));
+}
+
+// Consultar cada 10 segundos
+setInterval(actualizarContadorNotificaciones, 10000);
+
+// Consultar al cargar la página
+document.addEventListener('DOMContentLoaded', actualizarContadorNotificaciones);
+</script>
 """
 
 NUEVA_PUB_TEMPLATE = BASE_TEMPLATE + """
@@ -368,15 +414,19 @@ def inicio():
 
 @app.route('/api/verificar-nuevas-solicitudes')
 def verificar_nuevas_solicitudes():
-    if 'user_id' not in session:
-        return jsonify({"tiene_nuevas": False})
+    if 'usuario_id' not in session:
+        return jsonify({"cantidad": 0})
 
-    # Cuenta cuántas solicitudes pendientes tiene el usuario actual
-    # (Asegúrate de cambiar 'Solicitud' y 'usuario_id' si tus nombres en la base de datos son distintos)
-    cantidad_nuevas = Solicitud.query.filter_by(usuario_id=session['user_id'], estado='pendiente').count()
+    usuario_id = session['usuario_id']
+    
+    # Contamos cuántas solicitudes dirigidas a ti NO están completadas
+    cantidad_nuevas = SolicitudContacto.query.join(Publicacion).filter(
+        Publicacion.usuario_id == usuario_id,
+        SolicitudContacto.estado != 'completado'
+    ).count()
 
     return jsonify({
-        "tiene_nuevas": cantidad_nuevas > 0
+        "cantidad": cantidad_nuevas
     })
 
 @app.route('/registro', methods=['GET', 'POST'])

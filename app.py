@@ -469,22 +469,26 @@ def registro():
 
   # Si pasa las validaciones, creamos y guardamos el usuario
   try:
-   nuevo_usuario = Usuario(
-      nombre=nombre,
-      correo=correo,
-      institucion=institucion,
-      contacto=contacto,
-      carnet=carnet,
-  )
-  db.session.add(nuevo_usuario)
-  db.session.commit()
+        nuevo_usuario = Usuario(
+            nombre=nombre,
+            correo=correo,
+            institucion=institucion,
+            contacto=contacto,
+            carnet=carnet,
+        )
+        db.session.add(nuevo_usuario)
+        db.session.commit()
 
-  session['usuario_id'] = nuevo_usuario.id
-  return redirect(url_for('muro'))
-except IntegrityError:
-    db.session.rollback()
-    flash('Este correo electrónico ya se encuentra registrado. Intenta con otro.', 'error')
-    return redirect(url_for('inicio'))
+        session["usuario_id"] = nuevo_usuario.id
+        return redirect(url_for("muro"))
+        
+    except IntegrityError:
+        db.session.rollback()
+        flash(
+            "Este correo electrónico ya se encuentra registrado. Intenta con otro.",
+            "error",
+        )
+        return redirect(url_for("inicio"))
 
 @app.route('/api/verificar-nuevas-solicitudes')
 def verificar_nuevas_solicitudes():

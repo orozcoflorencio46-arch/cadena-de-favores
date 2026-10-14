@@ -483,12 +483,19 @@ def registro():
 
 @app.route('/limpiar-correo/<email>')
 def limpiar_correo(email):
-    usuario = Usuario.query.filter_by(correo=email).first()
-    if usuario:
-        db.session.delete(usuario)
-        db.session.commit()
-        return f"El correo {email} ha sido eliminado con éxito de la base de datos."
-    return f"El correo {email} no fue encontrado."
+    try:
+        usuario = Usuario.query.filter_by(correo=email).first()
+        if usuario:
+            # Si el usuario tiene publicaciones asociadas, las eliminamos primero para evitar conflictos
+            Publicacion.query.filter_by(usuario_id=usuario.id).delete()
+
+            db.session.delete(usuario)
+            db.session.commit()
+            return f"El correo {email} y sus datos asociados han sido eliminados con éxito."
+        return f"El correo {email} no fue encontrado en la base de datos."
+    except Exception as e:
+        db.session.rollback()
+        return f"Error al limpiar el correo: {str(e)}"
 
 @app.route('/api/verificar-nuevas-solicitudes')
 def verificar_nuevas_solicitudes():

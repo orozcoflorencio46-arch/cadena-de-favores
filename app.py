@@ -445,69 +445,47 @@ def inicio():
         return redirect(url_for('muro'))
     return render_template_string(REGISTRO_TEMPLATE)
 
-@app.route('/registro', methods=['POST'])
+@app.route('/registro', methods=['GET', 'POST'])
 def registro():
-  nombre = request.form.get('nombre', '').strip()
-  correo = request.form.get('correo', '').strip()
-  institucion = request.form.get('institucion', '').strip()
-  contacto = request.form.get('contacto', '').strip()
-  carnet = request.form.get('carnet', '').strip()
+    # Si el usuario accede mediante el envío del formulario (POST)
+    if request.method == 'POST':
+        nombre = request.form.get('nombre', '').strip()
+        correo = request.form.get('correo', '').strip()
+        institucion = request.form.get('institucion', '').strip()
+        contacto = request.form.get('contacto', '').strip()
+        carnet = request.form.get('carnet', '').strip()
 
-  # Validación estricta: debe ser exactamente de 7 dígitos numéricos
-  if not carnet.isdigit() or len(carnet) != 7:
-    flash(
-        'El número de carnet debe contener exactamente 7 dígitos numéricos.',
-        'error',
-    )
+        # Validación estricta: debe ser exactamente de 7 dígitos numéricos
+        if not carnet.isdigit() or len(carnet) != 7:
+            flash(
+                'El número de carnet debe contener exactamente 7 dígitos numéricos.',
+                'error',
+            )
+            return redirect(url_for('inicio'))
+
+        # Verificar si el carnet ya está registrado
+        carnet_existente = Usuario.query.filter_by(carnet=carnet).first()
+        if carnet_existente:
+            flash('Este número de carnet ya se encuentra registrado.', 'error')
+            return redirect(url_for('inicio'))
+
+        # Si pasa las validaciones, creamos y guardamos el usuario
+        nuevo_usuario = Usuario(
+            nombre=nombre,
+            correo=correo,
+            institucion=institucion,
+            contacto=contacto,
+            carnet=carnet
+        )
+        db.session.add(nuevo_usuario)
+        db.session.commit()
+
+        session['usuario_id'] = nuevo_usuario.id
+        return redirect(url_for('muro'))
+
+    # Si se intenta entrar por GET (escribiendo la URL, recargando o tras cerrar sesión)
     return redirect(url_for('inicio'))
 
-  # Verificar si el carnet ya está registrado
-  carnet_existente = Usuario.query.filter_by(carnet=carnet).first()
-  if carnet_existente:
-    flash('Este número de carnet ya se encuentra registrado.', 'error')
-    return redirect(url_for('inicio'))
-
-  # Si pasa las validaciones, creamos y guardamos el usuario
-  nuevo_usuario = Usuario(
-      nombre=nombre,
-      correo=correo,
-      institucion=institucion,
-      contacto=contacto,
-      carnet=carnet,
-  )
-  db.session.add(nuevo_usuario)
-  db.session.commit()
-
-  session['usuario_id'] = nuevo_usuario.id
-  return redirect(url_for('muro'))
-
-@app.route('/limpiar-correo/<identificador>')
-def limpiar_correo(identificador):
-    try:
-        # Busca al usuario por correo o por carnet
-        usuario = Usuario.query.filter((Usuario.correo == identificador) | (Usuario.carnet == identificador)).first()
-        if usuario:
-            # 1. Obtener los IDs de las publicaciones del usuario
-            publicaciones = Publicacion.query.filter_by(usuario_id=usuario.id).all()
-            pub_ids = [p.id for p in publicaciones]
-            
-            # 2. Borrar solicitudes vinculadas a sus publicaciones o hechas por él
-            if pub_ids:
-                SolicitudContacto.query.filter(SolicitudContacto.publicacion_id.in_(pub_ids)).delete(synchronize_session=False)
-            SolicitudContacto.query.filter_by(solicitante_id=usuario.id).delete(synchronize_session=False)
-            
-            # 3. Borrar las publicaciones del usuario
-            Publicacion.query.filter_by(usuario_id=usuario.id).delete()
-            
-            # 4. Borrar al usuario
-            db.session.delete(usuario)
-            db.session.commit()
-            return f"El registro con identificador {identificador} y todos sus datos asociados fueron eliminados con éxito."
-        return f"No se encontró ningún usuario con el correo o carnet: {identificador}"
-    except Exception as e:
-        db.session.rollback()
-        return f"Error al limpiar: {str(e)}"
-    
 @app.route('/api/verificar-nuevas-solicitudes')
 def verificar_nuevas_solicitudes():
     if 'usuario_id' not in session:

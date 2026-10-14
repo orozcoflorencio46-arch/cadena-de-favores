@@ -481,31 +481,6 @@ def registro():
   session['usuario_id'] = nuevo_usuario.id
   return redirect(url_for('muro'))
 
-@app.route('/limpiar-correo/<email>')
-def limpiar_correo(email):
-    try:
-        usuario = Usuario.query.filter_by(correo=email).first()
-        if usuario:
-            # 1. Obtener los IDs de las publicaciones del usuario
-            publicaciones = Publicacion.query.filter_by(usuario_id=usuario.id).all()
-            pub_ids = [p.id for p in publicaciones]
-            
-            # 2. Borrar solicitudes vinculadas a esas publicaciones O hechas por el usuario
-            if pub_ids:
-                SolicitudContacto.query.filter(SolicitudContacto.publicacion_id.in_(pub_ids)).delete(synchronize_session=False)
-            SolicitudContacto.query.filter_by(solicitante_id=usuario.id).delete(synchronize_session=False)
-            
-            # 3. Borrar las publicaciones del usuario
-            Publicacion.query.filter_by(usuario_id=usuario.id).delete()
-            
-            # 4. Borrar al usuario
-            db.session.delete(usuario)
-            db.session.commit()
-            return f"El correo {email} y todos sus datos asociados fueron eliminados con éxito."
-        return f"El correo {email} no fue encontrado en la base de datos."
-    except Exception as e:
-        db.session.rollback()
-        return f"Error al limpiar el correo: {str(e)}"
 
 @app.route('/api/verificar-nuevas-solicitudes')
 def verificar_nuevas_solicitudes():

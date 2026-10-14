@@ -436,7 +436,7 @@ def inicio():
     return render_template_string(REGISTRO_TEMPLATE)
 
 @app.route('/registro', methods=['POST'])
-def registrar_usuario():
+def registro():
   nombre = request.form.get('nombre', '').strip()
   correo = request.form.get('correo', '').strip()
   institucion = request.form.get('institucion', '').strip()

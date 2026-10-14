@@ -481,32 +481,6 @@ def registro():
   session['usuario_id'] = nuevo_usuario.id
   return redirect(url_for('muro'))
 
-@app.route('/limpiar-correo/<identificador>')
-def limpiar_correo(identificador):
-    try:
-        # Busca al usuario por correo o por carnet
-        usuario = Usuario.query.filter((Usuario.correo == identificador) | (Usuario.carnet == identificador)).first()
-        if usuario:
-            # 1. Obtener los IDs de las publicaciones del usuario
-            publicaciones = Publicacion.query.filter_by(usuario_id=usuario.id).all()
-            pub_ids = [p.id for p in publicaciones]
-            
-            # 2. Borrar solicitudes vinculadas a sus publicaciones o hechas por él
-            if pub_ids:
-                SolicitudContacto.query.filter(SolicitudContacto.publicacion_id.in_(pub_ids)).delete(synchronize_session=False)
-            SolicitudContacto.query.filter_by(solicitante_id=usuario.id).delete(synchronize_session=False)
-            
-            # 3. Borrar las publicaciones del usuario
-            Publicacion.query.filter_by(usuario_id=usuario.id).delete()
-            
-            # 4. Borrar al usuario
-            db.session.delete(usuario)
-            db.session.commit()
-            return f"El registro con identificador {identificador} y todos sus datos asociados fueron eliminados con éxito."
-        return f"No se encontró ningún usuario con el correo o carnet: {identificador}"
-    except Exception as e:
-        db.session.rollback()
-        return f"Error al limpiar: {str(e)}"
 
 @app.route('/api/verificar-nuevas-solicitudes')
 def verificar_nuevas_solicitudes():

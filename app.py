@@ -481,6 +481,15 @@ def registro():
   session['usuario_id'] = nuevo_usuario.id
   return redirect(url_for('muro'))
 
+@app.route('/limpiar-correo/<email>')
+def limpiar_correo(email):
+    usuario = Usuario.query.filter_by(correo=email).first()
+    if usuario:
+        db.session.delete(usuario)
+        db.session.commit()
+        return f"El correo {email} ha sido eliminado con éxito de la base de datos."
+    return f"El correo {email} no fue encontrado."
+
 @app.route('/api/verificar-nuevas-solicitudes')
 def verificar_nuevas_solicitudes():
     if 'usuario_id' not in session:

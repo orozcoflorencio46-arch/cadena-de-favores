@@ -1,4 +1,4 @@
-from flask import Flask, render_template_string, request, redirect, url_for, session,jsonify,send_file
+from flask import Flask, render_template_string, request, redirect, url_for, session,flash,jsonify,send_file
 from flask_sqlalchemy import SQLAlchemy 
 from sqlalchemy.exc import IntegrityError
 import qrcode
@@ -455,10 +455,7 @@ def registro():
 
   # Validación estricta: debe ser exactamente de 7 dígitos numéricos
   if not carnet.isdigit() or len(carnet) != 7:
-    flash(
-        'El número de carnet debe contener exactamente 7 dígitos numéricos.',
-        'error',
-    )
+    flash ('El número de carnet debe contener exactamente 7 dígitos numéricos.','error',)
     return redirect(url_for('inicio'))
 
   # Verificar si el carnet ya está registrado
@@ -478,14 +475,6 @@ try:
         )
         db.session.add(nuevo_usuario)
         db.session.commit()
-
-        session["usuario_id"] = nuevo_usuario.id
-        return redirect(url_for("muro"))
-
-except IntegrityError:
-        db.session.rollback()
-        flash("Este correo electrónico ya se encuentra registrado. Intenta con otro.", "error")
-        return redirect(url_for("inicio"))
 
 @app.route('/api/verificar-nuevas-solicitudes')
 def verificar_nuevas_solicitudes():

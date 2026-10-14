@@ -1,5 +1,5 @@
 from flask import Flask, render_template_string, request, redirect, url_for, session,jsonify,send_file
-from flask_sqlalchemy import SQLAlchemy
+from flask_sqlalchemy import SQLAlchemy from sqlalchemy.exc import IntegrityError
 import qrcode
 import io
 import os
@@ -467,7 +467,8 @@ def registro():
     return redirect(url_for('inicio'))
 
   # Si pasa las validaciones, creamos y guardamos el usuario
-  nuevo_usuario = Usuario(
+  try:
+   nuevo_usuario = Usuario(
       nombre=nombre,
       correo=correo,
       institucion=institucion,
@@ -479,6 +480,10 @@ def registro():
 
   session['usuario_id'] = nuevo_usuario.id
   return redirect(url_for('muro'))
+except IntegrityError:
+    db.session.rollback()
+    flash('Este correo electrónico ya se encuentra registrado. Intenta con otro.', 'error')
+    return redirect(url_for('inicio'))
 
 @app.route('/api/verificar-nuevas-solicitudes')
 def verificar_nuevas_solicitudes():

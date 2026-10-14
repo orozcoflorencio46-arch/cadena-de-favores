@@ -455,7 +455,10 @@ def registro():
 
   # Validación estricta: debe ser exactamente de 7 dígitos numéricos
   if not carnet.isdigit() or len(carnet) != 7:
-    flash ('El número de carnet debe contener exactamente 7 dígitos numéricos.','error',)
+    flash(
+        'El número de carnet debe contener exactamente 7 dígitos numéricos.',
+        'error',
+    )
     return redirect(url_for('inicio'))
 
   # Verificar si el carnet ya está registrado
@@ -465,16 +468,18 @@ def registro():
     return redirect(url_for('inicio'))
 
   # Si pasa las validaciones, creamos y guardamos el usuario
-try:
-        nuevo_usuario = Usuario(
-            nombre=nombre,
-            correo=correo,
-            institucion=institucion,
-            contacto=contacto,
-            carnet=carnet,
-        )
-        db.session.add(nuevo_usuario)
-        db.session.commit()
+  nuevo_usuario = Usuario(
+      nombre=nombre,
+      correo=correo,
+      institucion=institucion,
+      contacto=contacto,
+      carnet=carnet,
+  )
+  db.session.add(nuevo_usuario)
+  db.session.commit()
+
+  session['usuario_id'] = nuevo_usuario.id
+  return redirect(url_for('muro'))
 
 @app.route('/api/verificar-nuevas-solicitudes')
 def verificar_nuevas_solicitudes():

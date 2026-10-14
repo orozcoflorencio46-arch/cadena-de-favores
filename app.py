@@ -25,6 +25,7 @@ class Usuario(db.Model):
     correo = db.Column(db.String(100), unique=True, nullable=False)
     institucion = db.Column(db.String(100), nullable=False)
     contacto = db.Column(db.String(100), nullable=False)  # Teléfono / Telegram / Alias
+    carnet = db.Column(db.String(7), unique=True, nullable=False) # línea para el carnet de 7 dígitos
 # ----------------------------------------------------
 
 class Publicacion(db.Model):
@@ -314,6 +315,16 @@ SOLICITUDES_TEMPLATE = BASE_TEMPLATE + """
                   Autorizar y Compartir Datos
                 </button>
               </form>
+              
+              {% elif sol.estado == 'aceptado' %}
+    <!-- En este punto el dueño ya aceptó y se comparten los datos de ambos de inmediato -->
+    <div class="mt-2 p-3 bg-green-50 border border-green-200 rounded text-xs">
+        <p class="font-bold text-green-800">✅ ¡Datos de Contacto Compartidos!</p>
+        <p class="mt-1"><strong>Dueño de la publicación:</strong> {{ sol.publicacion.usuario.nombre }} — 📞 Teléfono: {{ sol.publicacion.usuario.contacto }}</p>
+        <p><strong>Persona interesada (Solicitante):</strong> {{ sol.solicitante.nombre }} — 📞 Teléfono: {{ sol.solicitante.contacto }}</p>
+        <p class="text-gray-600 mt-1 italic">Ambos ya pueden comunicarse para coordinar el apoyo.</p>
+    </div>
+
             {% elif sol.estado == 'brindado' %}
               <!-- El dueño VALIDA que recibió el apoyo y cierra la publicación -->
               <form action="/validar-apoyo/{{ sol.id }}" method="POST">
@@ -413,6 +424,42 @@ def inicio():
     if 'usuario_id' in session:
         return redirect(url_for('muro'))
     return render_template_string(REGISTRO_TEMPLATE)
+
+@app.route('/registro', methods=['POST'])
+def registro():
+  nombre = request.form.get('nombre', '').strip()
+  correo = request.form.get('correo', '').strip()
+  institucion = request.form.get('institucion', '').strip()
+  contacto = request.form.get('contacto', '').strip()
+  carnet = request.form.get('carnet', '').strip()
+
+  # Validación estricta: debe ser exactamente de 7 dígitos numéricos
+  if not carnet.isdigit() or len(carnet) != 7:
+    flash(
+        'El número de carnet debe contener exactamente 7 dígitos numéricos.',
+        'error',
+    )
+    return redirect(url_for('inicio'))
+
+  # Verificar si el carnet ya está registrado
+  carnet_existente = Usuario.query.filter_by(carnet=carnet).first()
+  if carnet_existente:
+    flash('Este número de carnet ya se encuentra registrado.', 'error')
+    return redirect(url_for('inicio'))
+
+  # Si pasa las validaciones, creamos y guardamos el usuario
+  nuevo_usuario = Usuario(
+      nombre=nombre,
+      correo=correo,
+      institucion=institucion,
+      contacto=contacto,
+      carnet=carnet,
+  )
+  db.session.add(nuevo_usuario)
+  db.session.commit()
+
+  session['usuario_id'] = nuevo_usuario.id
+  return redirect(url_for('muro'))
 
 @app.route('/api/verificar-nuevas-solicitudes')
 def verificar_nuevas_solicitudes():
@@ -518,17 +565,22 @@ def solicitar_contacto(pub_id):
 # --- 2. RUTA PARA QUE EL DUEÑO AUTORICE Y COMPARTA SUS DATOS ---
 @app.route('/aceptar-solicitud/<int:sol_id>', methods=['POST'])
 def aceptar_solicitud(sol_id):
-    if 'usuario_id' not in session:
-        return redirect(url_for('registro'))
-        
-    solicitud = SolicitudContacto.query.get_or_404(sol_id)
-    
-    # Solo el dueño de la publicación puede autorizar compartir sus datos
-    if solicitud.publicacion.usuario_id == session['usuario_id']:
-        solicitud.estado = 'aceptado'
-        db.session.commit()
-        
+  if 'usuario_id' not in session:
+    return redirect(url_for('inicio'))
+
+  solicitud = SolicitudContacto.query.get_or_404(sol_id)
+
+  # Verificar que el usuario actual sea el dueño de la publicación
+  if solicitud.publicacion.usuario_id != session['usuario_id']:
+    flash('No tienes permiso para aceptar esta solicitud.', 'error')
     return redirect(url_for('mis_solicitudes'))
+
+  # Cambiar el estado a aceptado para habilitar la vista de contactos
+  solicitud.estado = 'aceptado'
+  db.session.commit()
+
+  flash('¡Solicitud aceptada! Ahora ambos pueden ver sus datos de contacto.', 'success')
+  return redirect(url_for('mis_solicitudes'))
 
 
 # --- 3. RUTA PARA QUE EL SOLICITANTE MARQUE COMO BRINDADO ---

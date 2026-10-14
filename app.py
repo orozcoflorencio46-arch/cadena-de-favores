@@ -135,7 +135,7 @@ REGISTRO_TEMPLATE = BASE_TEMPLATE + """
     <form method="POST" action="{{ url_for('registro') }}" class="space-y-4">
         <div>
             <label class="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1">Nombre completo</label>
-            <input type="text" name="nombre" required placeholder="Ej. Ana García" 
+            <input type="text" name="nombre" required placeholder="Ej. gabriela sofia" 
                 class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none transition-all">
         </div>
 
@@ -157,12 +157,12 @@ REGISTRO_TEMPLATE = BASE_TEMPLATE + """
                 class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none transition-all">
         </div>
 <div class="mb-4">
-    <label class="block text-sm font-medium text-gray-700">Número de Carnet ()</label>
+    <label class="block text-sm font-medium text-gray-700">Número de Carnet </label>
     <input type="text" name="carnet" required 
            maxlength="9" 
            minlength="1" 
            pattern="[0-9]{7}" 
-           title="El carnet debe contener exactamente 7 dígitos numéricos"
+           title="El carnet es erroneo"
            class="w-full border p-2 rounded mt-1" 
            placeholder="Ej. 202312374">
 </div>

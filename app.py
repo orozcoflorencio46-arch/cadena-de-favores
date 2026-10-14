@@ -482,7 +482,7 @@ def registro():
         session["usuario_id"] = nuevo_usuario.id
         return redirect(url_for("muro"))
         
-    except IntegrityError:
+ except IntegrityError:
         db.session.rollback()
         flash(
             "Este correo electrónico ya se encuentra registrado. Intenta con otro.",

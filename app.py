@@ -486,12 +486,21 @@ def limpiar_correo(email):
     try:
         usuario = Usuario.query.filter_by(correo=email).first()
         if usuario:
-            # Si el usuario tiene publicaciones asociadas, las eliminamos primero para evitar conflictos
+            # 1. Obtener los IDs de las publicaciones del usuario
+            publicaciones = Publicacion.query.filter_by(usuario_id=usuario.id).all()
+            pub_ids = [p.id for p in publicaciones]
+            
+            # 2. Borrar solicitudes vinculadas a esas publicaciones
+            if pub_ids:
+                SolicitudContacto.query.filter(SolicitudContacto.publicacion_id.in_(pub_ids)).delete(synchronize_session=False)
+            
+            # 3. Borrar las publicaciones del usuario
             Publicacion.query.filter_by(usuario_id=usuario.id).delete()
-
+            
+            # 4. Borrar al usuario
             db.session.delete(usuario)
             db.session.commit()
-            return f"El correo {email} y sus datos asociados han sido eliminados con éxito."
+            return f"El correo {email} y todos sus datos asociados fueron eliminados con éxito."
         return f"El correo {email} no fue encontrado en la base de datos."
     except Exception as e:
         db.session.rollback()

@@ -1,5 +1,6 @@
 from flask import Flask, render_template_string, request, redirect, url_for, session,jsonify,send_file
-from flask_sqlalchemy import SQLAlchemy from sqlalchemy.exc import IntegrityError
+from flask_sqlalchemy import SQLAlchemy 
+from sqlalchemy.exc import IntegrityError
 import qrcode
 import io
 import os

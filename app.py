@@ -157,14 +157,14 @@ REGISTRO_TEMPLATE = BASE_TEMPLATE + """
                 class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none transition-all">
         </div>
 <div class="mb-4">
-    <label class="block text-sm font-medium text-gray-700">Número de Carnet (7 dígitos)</label>
+    <label class="block text-sm font-medium text-gray-700">Número de Carnet ()</label>
     <input type="text" name="carnet" required 
-           maxlength="7" 
-           minlength="7" 
+           maxlength="9" 
+           minlength="1" 
            pattern="[0-9]{7}" 
            title="El carnet debe contener exactamente 7 dígitos numéricos"
            class="w-full border p-2 rounded mt-1" 
-           placeholder="Ej. 2023123">
+           placeholder="Ej. 202312374">
 </div>
         <!-- Botón con Llamado a la Acción (CTA) Motivacional -->
         <button type="submit" 

@@ -16,6 +16,15 @@ app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///cadena_v3.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+from sqlalchemy import text
+
+with app.app_context():
+    db.create_all()
+    try:
+        db.session.execute(text('ALTER TABLE usuario ADD COLUMN carnet VARCHAR(7);'))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 # -------------------------------------------------------------------
 # MODELOS DE BASE DE DATOS
 # -------------------------------------------------------------------

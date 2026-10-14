@@ -490,9 +490,10 @@ def limpiar_correo(email):
             publicaciones = Publicacion.query.filter_by(usuario_id=usuario.id).all()
             pub_ids = [p.id for p in publicaciones]
             
-            # 2. Borrar solicitudes vinculadas a esas publicaciones
+            # 2. Borrar solicitudes vinculadas a esas publicaciones O hechas por el usuario
             if pub_ids:
                 SolicitudContacto.query.filter(SolicitudContacto.publicacion_id.in_(pub_ids)).delete(synchronize_session=False)
+            SolicitudContacto.query.filter_by(solicitante_id=usuario.id).delete(synchronize_session=False)
             
             # 3. Borrar las publicaciones del usuario
             Publicacion.query.filter_by(usuario_id=usuario.id).delete()

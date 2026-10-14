@@ -156,7 +156,16 @@ REGISTRO_TEMPLATE = BASE_TEMPLATE + """
             <input type="text" name="contacto" required placeholder="+502 5555-5555" 
                 class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none transition-all">
         </div>
-
+<div class="mb-4">
+    <label class="block text-sm font-medium text-gray-700">Número de Carnet (7 dígitos)</label>
+    <input type="text" name="carnet" required 
+           maxlength="7" 
+           minlength="7" 
+           pattern="[0-9]{7}" 
+           title="El carnet debe contener exactamente 7 dígitos numéricos"
+           class="w-full border p-2 rounded mt-1" 
+           placeholder="Ej. 2023123">
+</div>
         <!-- Botón con Llamado a la Acción (CTA) Motivacional -->
         <button type="submit" 
             class="w-full mt-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-3 px-4 rounded-xl font-bold shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2">
@@ -166,6 +175,7 @@ REGISTRO_TEMPLATE = BASE_TEMPLATE + """
             </svg>
         </button>
     </form>
+    </main></body></html>.
 
     <!-- Pie del formulario c """ 
 
@@ -426,7 +436,7 @@ def inicio():
     return render_template_string(REGISTRO_TEMPLATE)
 
 @app.route('/registro', methods=['POST'])
-def registro():
+def registrar_usuario():
   nombre = request.form.get('nombre', '').strip()
   correo = request.form.get('correo', '').strip()
   institucion = request.form.get('institucion', '').strip()

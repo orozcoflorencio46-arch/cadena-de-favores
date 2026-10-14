@@ -315,7 +315,7 @@ SOLICITUDES_TEMPLATE = BASE_TEMPLATE + """
                   Autorizar y Compartir Datos
                 </button>
               </form>
-              
+
               {% elif sol.estado == 'aceptado' %}
     <!-- En este punto el dueño ya aceptó y se comparten los datos de ambos de inmediato -->
     <div class="mt-2 p-3 bg-green-50 border border-green-200 rounded text-xs">
@@ -484,25 +484,6 @@ def verificar_nuevas_solicitudes():
         "total_historial": total_historial
     })
 
-@app.route('/registro', methods=['GET', 'POST'])
-def registro():
-    if request.method == 'POST':
-        nombre = request.form['nombre']
-        correo = request.form['correo']
-        institucion = request.form['institucion']
-        contacto = request.form['contacto']
-    
-        usuario = Usuario.query.filter_by(correo=correo).first()
-        if not usuario:
-            usuario = Usuario(nombre=nombre, correo=correo, institucion=institucion, contacto=contacto)
-            db.session.add(usuario)
-            db.session.commit()
-
-        session['usuario_id'] = usuario.id
-        session['usuario_nombre'] = usuario.nombre
-        return redirect(url_for('muro'))
-
-    return render_template_string(REGISTRO_TEMPLATE)
 
 @app.route('/muro')
 def muro():

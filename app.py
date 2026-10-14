@@ -485,7 +485,7 @@ def registro():
 
     # Si se intenta entrar por GET (escribiendo la URL, recargando o tras cerrar sesión)
     return redirect(url_for('inicio'))
-    @app.route('/limpiar-correo/<identificador>')
+@app.route('/limpiar-correo/<identificador>')   
 def limpiar_correo(identificador):
     try:
         # Busca al usuario por correo o por carnet

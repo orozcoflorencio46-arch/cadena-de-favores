@@ -233,18 +233,13 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
     </span>
 </a>
 
-<!-- Coloca esto en tu HTML del muro -->
-<audio id="tono-notificacion" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
+<!-- Elemento de audio con un tono claro y corto -->
+<audio id="tono-notificacion" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
 <script>
+// Variable para recordar la cantidad anterior
 let cantidadAnterior = 0;
 let primerCarga = true;
-let audioHabilitado = false;
-
-// Habilitar audio con el primer clic que des en la pantalla
-document.addEventListener('click', () => {
-    audioHabilitado = true;
-}, { once: true });
 
 function actualizarContadorNotificaciones() {
     fetch('/api/verificar-nuevas-solicitudes')
@@ -263,24 +258,27 @@ function actualizarContadorNotificaciones() {
                 }
             }
 
-            // Reproducir sonido si la cantidad de solicitudes aumenta
+            // Si llegaron NUEVAS solicitudes (la cantidad aumentó)
             if (cantidadNueva > cantidadAnterior && !primerCarga) {
-                if (tono && audioHabilitado) {
-                    tono.currentTime = 0;
+                if (tono) {
                     tono.play().catch(error => {
-                        console.log("Audio bloqueado:", error);
+                        // Los navegadores bloquean el sonido si el usuario no ha interactuado aún con la página
+                        console.log("El navegador bloqueó la reproducción automática del audio:", error);
                     });
                 }
             }
 
+            // Actualizamos el estado
             cantidadAnterior = cantidadNueva;
             primerCarga = false;
         })
-        .catch(error => console.error('Error:', error));
+        .catch(error => console.error('Error al obtener notificaciones:', error));
 }
 
 // Consultar cada 10 segundos
 setInterval(actualizarContadorNotificaciones, 10000);
+
+// Consultar al cargar la página
 document.addEventListener('DOMContentLoaded', actualizarContadorNotificaciones);
 </script>
 """

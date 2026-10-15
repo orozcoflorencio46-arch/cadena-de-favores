@@ -233,19 +233,13 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
     </span>
 </a>
 
-<!-- Elemento de audio optimizado -->
+<!-- Elemento de audio con un tono claro y corto -->
 <audio id="tono-notificacion" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
 <script>
 // Variable para recordar la cantidad anterior
 let cantidadAnterior = 0;
 let primerCarga = true;
-let audioHabilitado = false;
-
-// Habilitar el audio automáticamente con el primer clic del usuario en la página
-document.addEventListener('click', () => {
-    audioHabilitado = true;
-}, { once: true });
 
 function actualizarContadorNotificaciones() {
     fetch('/api/verificar-nuevas-solicitudes')
@@ -264,17 +258,17 @@ function actualizarContadorNotificaciones() {
                 }
             }
 
-            // Reproducir sonido en cada nueva notificación (cuando la cantidad aumenta respecto a la anterior)
+            // Si llegaron NUEVAS solicitudes (la cantidad aumentó)
             if (cantidadNueva > cantidadAnterior && !primerCarga) {
-                if (tono && audioHabilitado) {
-                    tono.currentTime = 0; // Reinicia el audio para permitir repeticiones rápidas
+                if (tono) {
                     tono.play().catch(error => {
+                        // Los navegadores bloquean el sonido si el usuario no ha interactuado aún con la página
                         console.log("El navegador bloqueó la reproducción automática del audio:", error);
                     });
                 }
             }
 
-            // Actualizamos el estado para las siguientes revisiones
+            // Actualizamos el estado
             cantidadAnterior = cantidadNueva;
             primerCarga = false;
         })

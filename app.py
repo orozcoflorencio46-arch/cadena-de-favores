@@ -546,6 +546,21 @@ def solicitar_contacto(pub_id):
             db.session.commit()
     return redirect(url_for('mis_solicitudes'))
 
+@app.route('/api/verificar-nuevas-solicitudes')
+def verificar_nuevas_solicitudes():
+    if 'usuario_id' not in session:
+        return {'cantidad': 0}
+    
+    usuario_actual_id = session['usuario_id']
+    
+    # Cuenta cuántas solicitudes pendientes tienen las publicaciones de este usuario
+    # (Ajusta esta consulta según cómo tengas relacionadas tus tablas en SQLAlchemy)
+    cantidad = SolicitudContacto.query.join(Publicacion).filter(
+        Publicacion.usuario_id == usuario_actual_id,
+        SolicitudContacto.estado == 'pendiente'
+    ).count()
+    
+    return {'cantidad': cantidad}
 
 # --- 2. RUTA PARA QUE EL DUEÑO AUTORICE Y COMPARTA SUS DATOS ---
 @app.route('/aceptar-solicitud/<int:sol_id>', methods=['POST'])

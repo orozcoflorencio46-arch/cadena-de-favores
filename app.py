@@ -466,10 +466,11 @@ def registro():
         # Verificar si el carnet ya está registrado
         carnet_existente = Usuario.query.filter_by(carnet=carnet).first()
         if carnet_existente:
-            flash('Este número de carnet ya se encuentra registrado.', 'error')
-            return redirect(url_for('inicio'))
+            # ¡Solución! Si ya existe, lo logueamos directamente en lugar de rebotarlo
+            session['usuario_id'] = carnet_existente.id
+            return redirect(url_for('muro'))
 
-        # Si pasa las validaciones, creamos y guardamos el usuario
+        # Si es un usuario completamente nuevo, lo creamos y guardamos
         nuevo_usuario = Usuario(
             nombre=nombre,
             correo=correo,
@@ -483,33 +484,36 @@ def registro():
         session['usuario_id'] = nuevo_usuario.id
         return redirect(url_for('muro'))
 
-    # Si se intenta entrar por GET (escribiendo la URL, recargando o tras cerrar sesión)
+    # Si se intenta entrar por GET
     return redirect(url_for('inicio'))
 
-@app.route('/api/verificar-nuevas-solicitudes')
-def verificar_nuevas_solicitudes():
-    if 'usuario_id' not in session:
-        return jsonify({"cantidad": 0, "total_historial": 0})
-
-    usuario_id = session['usuario_id']
+@app.route('/limpiar-correo/<identificador>')
+def limpiar_correo(identificador):
+    try:
+        # Busca al usuario por correo o por carnet
+        usuario = Usuario.query.filter((Usuario.correo == identificador) | (Usuario.carnet == identificador)).first()
+        if usuario:
+            # 1. Obtener los IDs de las publicaciones del usuario
+            publicaciones = Publicacion.query.filter_by(usuario_id=usuario.id).all()
+            pub_ids = [p.id for p in publicaciones]
+            
+            # 2. Borrar solicitudes vinculadas a sus publicaciones o hechas por él
+            if pub_ids:
+                SolicitudContacto.query.filter(SolicitudContacto.publicacion_id.in_(pub_ids)).delete(synchronize_session=False)
+            SolicitudContacto.query.filter_by(solicitante_id=usuario.id).delete(synchronize_session=False)
+            
+            # 3. Borrar las publicaciones del usuario
+            Publicacion.query.filter_by(usuario_id=usuario.id).delete()
+            
+            # 4. Borrar al usuario
+            db.session.delete(usuario)
+            db.session.commit()
+            return f"El registro con identificador {identificador} y todos sus datos asociados fueron eliminados con éxito."
+        return f"No se encontró ningún usuario con el correo o carnet: {identificador}"
+    except Exception as e:
+        db.session.rollback()
+        return f"Error al limpiar: {str(e)}"
     
-    # Solicitudes pendientes (nuevas o en proceso)
-    pendientes = SolicitudContacto.query.join(Publicacion).filter(
-        Publicacion.usuario_id == usuario_id,
-        SolicitudContacto.estado != 'completado'
-    ).count()
-
-    # Total de solicitudes para llevar control de cambios (incluyendo cerradas/completadas)
-    total_historial = SolicitudContacto.query.join(Publicacion).filter(
-        Publicacion.usuario_id == usuario_id
-    ).count()
-
-    return jsonify({
-        "cantidad": pendientes,
-        "total_historial": total_historial
-    })
-
-
 @app.route('/muro')
 def muro():
     if 'usuario_id' not in session:

@@ -234,8 +234,7 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
 </a>
 
 <!-- Elemento de audio con un tono claro y corto -->
-<audio id="tono-notificacion" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
-
+<audio id="tono-notificacion" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
 <script>
 // Variable para recordar la cantidad anterior
 let cantidadAnterior = 0;

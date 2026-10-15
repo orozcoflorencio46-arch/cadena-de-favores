@@ -119,6 +119,26 @@ BASE_TEMPLATE = """
 
     <!-- Contenido Principal -->
     <main class="max-w-6xl mx-auto p-6 relative">
+
+    <!-- Enlace para Android y navegadores PWA -->
+<link rel="manifest" href="/manifest.json">
+
+<!-- Soporte para iPhone (iOS) -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Favores">
+<link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3516/3516134.png">
+
+<!-- Registro del Service Worker -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then((reg) => console.log('Service Worker listo:', reg.scope))
+        .catch((err) => console.log('Error en Service Worker:', err));
+    });
+  }
+</script>
     """
 REGISTRO_TEMPLATE = BASE_TEMPLATE + """
 <div class="max-w-md mx-auto my-8 bg-white p-8 rounded-2xl shadow-xl border border-gray-100 transform transition-all hover:shadow-2xl">
@@ -661,3 +681,42 @@ def logout():
 # -----------------------------------------------------------------------------
 with app.app_context():
     db.create_all()
+
+@app.route('/manifest.json')
+def manifest():
+    manifest_data = """{
+      "name": "Cadena de Favores",
+      "short_name": "Favores",
+      "start_url": "/muro",
+      "display": "standalone",
+      "background_color": "#ffffff",
+      "theme_color": "#4f46e5",
+      "icons": [
+        {
+          "src": "https://cdn-icons-png.flaticon.com/512/3516/3516134.png",
+          "sizes": "512x512",
+          "type": "image/png",
+          "purpose": "any maskable"
+        }
+      ]
+    }"""
+    return Response(manifest_data, mimetype='application/json')
+
+@app.route('/sw.js')
+def service_worker():
+    sw_data = """
+    self.addEventListener('install', (e) => {
+      e.waitUntil(
+        caches.open('favores-cache-v1').then((cache) => {
+          return cache.addAll(['/muro']);
+        })
+      );
+    });
+
+    self.addEventListener('fetch', (e) => {
+      e.respondWith(
+        fetch(e.request).catch(() => caches.match(e.request))
+      );
+    });
+    """
+    return Response(sw_data, mimetype='application/javascript')

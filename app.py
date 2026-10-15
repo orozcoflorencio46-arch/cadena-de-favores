@@ -301,6 +301,41 @@ setInterval(actualizarContadorNotificaciones, 10000);
 // Consultar al cargar la página
 document.addEventListener('DOMContentLoaded', actualizarContadorNotificaciones);
 </script>
+
+<!-- Botón de Instalación Personalizado -->
+<button id="btn-instalar" class="hidden items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-medium shadow-lg transition-all">
+    📱 Instalar Aplicación
+</button>
+
+<script>
+let deferredPrompt;
+const btnInstalar = document.getElementById('btn-instalar');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    // Previene que Chrome muestre el banner automático predeterminado
+    e.preventDefault();
+    deferredPrompt = e;
+    // Muestra tu botón personalizado
+    if (btnInstalar) {
+        btnInstalar.classList.remove('hidden');
+        btnInstalar.classList.add('flex');
+    }
+});
+
+if (btnInstalar) {
+    btnInstalar.addEventListener('click', async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                console.log('Usuario aceptó instalar la PWA');
+            }
+            deferredPrompt = null;
+            btnInstalar.classList.add('hidden');
+        }
+    });
+}
+</script>
 """
 
 NUEVA_PUB_TEMPLATE = BASE_TEMPLATE + """
@@ -681,19 +716,25 @@ def logout():
 # -----------------------------------------------------------------------------
 with app.app_context():
     db.create_all()
-
 @app.route('/manifest.json')
 def manifest():
     manifest_data = """{
-      "name": "Cadena de Favores",
+      "name": "Cadena de Favores Estudiantiles",
       "short_name": "Favores",
       "start_url": "/muro",
       "display": "standalone",
-      "background_color": "#ffffff",
+      "background_color": "#4f46e5",
       "theme_color": "#4f46e5",
+      "orientation": "portrait",
       "icons": [
         {
-          "src": "https://cdn-icons-png.flaticon.com/512/3516/3516134.png",
+          "src": "https://cdn-icons-png.flaticon.com/512/3076/3076753.png",
+          "sizes": "192x192",
+          "type": "image/png",
+          "purpose": "any maskable"
+        },
+        {
+          "src": "https://cdn-icons-png.flaticon.com/512/3076/3076753.png",
           "sizes": "512x512",
           "type": "image/png",
           "purpose": "any maskable"
@@ -701,22 +742,3 @@ def manifest():
       ]
     }"""
     return Response(manifest_data, mimetype='application/json')
-
-@app.route('/sw.js')
-def service_worker():
-    sw_data = """
-    self.addEventListener('install', (e) => {
-      e.waitUntil(
-        caches.open('favores-cache-v1').then((cache) => {
-          return cache.addAll(['/muro']);
-        })
-      );
-    });
-
-    self.addEventListener('fetch', (e) => {
-      e.respondWith(
-        fetch(e.request).catch(() => caches.match(e.request))
-      );
-    });
-    """
-    return Response(sw_data, mimetype='application/javascript')

@@ -552,7 +552,7 @@ def muro():
     limite_tiempo = datetime.now() - timedelta(days=2)
     try:
         vencidas = Publicacion.query.filter(
-            Publicacion.fecha < limite_tiempo,
+            Publicacion.fecha_creacion < limite_tiempo,
             Publicacion.estado != 'completada'
         ).all()
         
@@ -565,7 +565,7 @@ def muro():
         print("Error al eliminar publicaciones vencidas:", e)
 
     # 2. Consultar las publicaciones activas
-    publicaciones = Publicacion.query.filter(Publicacion.estado != 'completada').order_by(Publicacion.fecha.desc()).all()
+    publicaciones = Publicacion.query.filter(Publicacion.estado != 'completada').order_by(Publicacion.fecha_creacion.desc()).all()
     
     return render_template_string(MURO_TEMPLATE, publicaciones=publicaciones, usuario_id=session['usuario_id'])
     

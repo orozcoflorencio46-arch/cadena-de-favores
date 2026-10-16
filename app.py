@@ -228,7 +228,7 @@ REGISTRO_TEMPLATE = BASE_TEMPLATE + """
 
 MURO_TEMPLATE = BASE_TEMPLATE + """
 <div class="flex justify-between items-center mb-6">
-    <h2 class="text-2xl font-bold">Muro de Necesidades y Apoyos</h2>
+    <h2 class="text-2xl font-bold text-white">Muro de Necesidades y Apoyos</h2>
     <a href="{{ url_for('nueva_publicacion') }}" class="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700">+ Publicar</a>
 </div>
 

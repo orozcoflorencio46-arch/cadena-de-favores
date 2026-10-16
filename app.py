@@ -565,7 +565,7 @@ def muro():
         return redirect(url_for('registro'))
     
     # 1. Eliminar publicaciones de más de 3 días que no han sido completadas
-    limite_tiempo = datetime.now() - timedelta(days=2)
+    limite_tiempo = datetime.now() - timedelta(days=3)
     try:
         vencidas = Publicacion.query.filter(
             Publicacion.fecha_creacion < limite_tiempo,
@@ -751,29 +751,42 @@ def logout():
 # -----------------------------------------------------------------------------
 with app.app_context():
     db.create_all()
+from flask import jsonify
+
 @app.route('/manifest.json')
 def manifest():
-    manifest_data = """{
-      "name": "Cadena de Favores Estudiantiles",
-      "short_name": "Favores",
-      "start_url": "/muro",
-      "display": "standalone",
-      "background_color": "#4f46e5",
-      "theme_color": "#4f46e5",
-      "orientation": "portrait",
-      "icons": [
-        {
-          "src": "https://cdn-icons-png.flaticon.com/512/3076/3076753.png",
-          "sizes": "192x192",
-          "type": "image/png",
-          "purpose": "any maskable"
-        },
-        {
-          "src": "https://cdn-icons-png.flaticon.com/512/3076/3076753.png",
-          "sizes": "512x512",
-          "type": "image/png",
-          "purpose": "any maskable"
-        }
-      ]
-    }"""
-    return Response(manifest_data, mimetype='application/json')
+    return jsonify({
+        "name": "Cadena de Favores Estudiantiles",
+        "short_name": "Cadena de Favores",
+        "start_url": "/muro",
+        "display": "standalone",
+        "background_color": "#0f172a",
+        "theme_color": "#4f46e5",
+        "icons": [
+            {
+                "src": "https://cdn-icons-png.flaticon.com/512/3076/3076129.png",
+                "sizes": "192x192",
+                "type": "image/png"
+            },
+            {
+                "src": "https://cdn-icons-png.flaticon.com/512/3076/3076129.png",
+                "sizes": "512x512",
+                "type": "image/png"
+            }
+        ]
+    })
+
+@app.route('/sw.js')
+def service_worker():
+    sw_code = """
+    self.addEventListener('install', (e) => {
+        self.skipWaiting();
+    });
+    self.addEventListener('activate', (e) => {
+        e.waitUntil(clients.claim());
+    });
+    self.addEventListener('fetch', (e) => {
+        e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    });
+    """
+    return sw_code, 200, {'Content-Type': 'application/javascript'}

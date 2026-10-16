@@ -384,7 +384,7 @@ NUEVA_PUB_TEMPLATE = BASE_TEMPLATE + """
 """
 
 SOLICITUDES_TEMPLATE = BASE_TEMPLATE + """
-<h2 class="text-2xl font-bold mb-6">Centro de Comunicación Confidencial</h2>
+<h2 class="text-2xl font-bold text-white mb-6">Centro de Comunicación Confidencial</h2>
 
 <div class="space-y-6">
 

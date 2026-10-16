@@ -27,6 +27,11 @@ with app.app_context():
         db.session.commit()
     except Exception:
         db.session.rollback()
+    try:
+        db.session.execute(text('ALTER TABLE publicacion ADD COLUMN fecha_creacion TIMESTAMP;'))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 # -------------------------------------------------------------------
 # MODELOS DE BASE DE DATOS
 # -------------------------------------------------------------------

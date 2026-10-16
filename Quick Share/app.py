@@ -57,7 +57,9 @@ BASE_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cadena de Favores Estudiantiles</title>
     <script src="https://cdn.tailwindcss.com"></script>
-</head>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    
 <body class="bg-slate-900 min-h-screen text-gray-800 relative font-sans">
 
     <!-- Fondo dinámico con brillo sutil -->

@@ -357,7 +357,7 @@ if (btnInstalar) {
 
 NUEVA_PUB_TEMPLATE = BASE_TEMPLATE + """
 <div class="max-w-lg mx-auto bg-white p-6 rounded-lg shadow">
-    <h2 class="text-xl font-bold mb-4">Nueva Publicación</h2>
+    <h2 class="text-xl font-bold text-white mb-4">Nueva Publicación</h2>
     <form method="POST" class="space-y-4">
         <div>
             <label class="block text-sm font-medium">¿Qué deseas hacer?</label>

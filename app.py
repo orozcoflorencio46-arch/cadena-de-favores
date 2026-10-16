@@ -1,5 +1,6 @@
 from flask import Flask, render_template_string, request, redirect, url_for, session,flash,jsonify,send_file
 from flask_sqlalchemy import SQLAlchemy 
+from datetime import datetime, timedelta
 from sqlalchemy.exc import IntegrityError
 import qrcode
 import io
@@ -546,9 +547,27 @@ def registro():
 def muro():
     if 'usuario_id' not in session:
         return redirect(url_for('registro'))
-    publicaciones = Publicacion.query.filter(Publicacion.estado!= 'completada').order_by(Publicacion.id.desc()).all()
-    return render_template_string(MURO_TEMPLATE, publicaciones=publicaciones,
-    usuario_id=session['usuario_id'])
+    
+    # 1. Eliminar publicaciones de más de 3 días que no han sido completadas
+    limite_tiempo = datetime.now() - timedelta(days=3)
+    try:
+        vencidas = Publicacion.query.filter(
+            Publicacion.fecha < limite_tiempo,
+            Publicacion.estado != 'completada'
+        ).all()
+        
+        for pub in vencidas:
+            db.session.delete(pub)
+            
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print("Error al eliminar publicaciones vencidas:", e)
+
+    # 2. Consultar las publicaciones activas
+    publicaciones = Publicacion.query.filter(Publicacion.estado != 'completada').order_by(Publicacion.fecha.desc()).all()
+    
+    return render_template_string(MURO_TEMPLATE, publicaciones=publicaciones, usuario_id=session['usuario_id'])
     
 @app.route('/nueva-publicacion', methods=['GET', 'POST'])
 def nueva_publicacion():

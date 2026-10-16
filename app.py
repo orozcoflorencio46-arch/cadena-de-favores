@@ -46,6 +46,7 @@ class Publicacion(db.Model):
     descripcion = db.Column(db.Text, nullable=False)
     materia_area = db.Column(db.String(100), nullable=False)
     estado = db.Column(db.String(20), default ='activa')# 'activa', 'en_proceso', 'completada' 
+    fecha_creacion = db.Column(db.DateTime, default=datetime.now)
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     usuario = db.relationship('Usuario', backref='publicaciones')
 class SolicitudContacto(db.Model):
@@ -69,6 +70,16 @@ BASE_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cadena de Favores Estudiantiles</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Enlace al Manifest y Service Worker -->
+        <link rel="manifest" href="/manifest.json">
+        <meta name="theme-color" content="#4f46e5">
+        <script>
+          if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+              navigator.serviceWorker.register('/sw.js');
+            });
+          }
+        </script>
 </head>
 <body class="bg-slate-900 min-h-screen text-gray-800 relative font-sans">
 

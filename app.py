@@ -549,7 +549,7 @@ def muro():
         return redirect(url_for('registro'))
     
     # 1. Eliminar publicaciones de más de 3 días que no han sido completadas
-    limite_tiempo = datetime.now() - timedelta(days=3)
+    limite_tiempo = datetime.now() - timedelta(days=2)
     try:
         vencidas = Publicacion.query.filter(
             Publicacion.fecha < limite_tiempo,

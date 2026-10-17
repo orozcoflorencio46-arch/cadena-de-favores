@@ -364,7 +364,8 @@ document.addEventListener('DOMContentLoaded', actualizarContadorNotificaciones);
  <script>
   let deferredPrompt = null;
 
-   window.addEventListener('beforeinstallprompt', (e) => {
+  // Escuchar cuando el navegador activa el instalador automático
+  window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
   });
@@ -372,23 +373,24 @@ document.addEventListener('DOMContentLoaded', actualizarContadorNotificaciones);
   document.addEventListener('DOMContentLoaded', function() {
     const btnInstalar = document.getElementById('btn-instalar');
     const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    const isInStandaloneMode = ('standalone' in window.navigator) && (window.navigator.standalone);
-if (btnInstalar) {
+
+    if (btnInstalar) {
       btnInstalar.addEventListener('click', async () => {
         if (isIOS) {
-          // Guía manual para iPhone / Safari
-          alert('📱 Para instalar la app en tu iPhone:\n\n1. Toca el botón de Compartir (el cuadrado con la flecha hacia arriba ⬆️) en la barra inferior de Safari.\n2. Desliza y selecciona "Añadir a pantalla de inicio".');
+          // Guía para iPhone (Safari)
+          alert('📱 Para instalar la app en tu iPhone:\n\n1. Toca el botón de Compartir (flecha hacia arriba ⬆️) en Safari.\n2. Selecciona "Añadir a pantalla de inicio".');
         } else if (deferredPrompt) {
-          // Instalación automática en Android / Chrome / PC
+          // Instalación automática en Android / Chrome cuando está disponible
           deferredPrompt.prompt();
           const { outcome } = await deferredPrompt.userChoice;
           if (outcome === 'accepted') {
-            console.log('Usuario aceptó instalar la PWA');
+            console.log('Usuario instaló la aplicación');
+            btnInstalar.classList.add('hidden');
           }
           deferredPrompt = null;
         } else {
-          // Si el navegador ya está instalado o no dispara el evento automático
-          alert('💻 Para instalar la aplicación:\n\nAbre el menú de opciones de tu navegador (los tres puntos en la esquina superior) y selecciona "Instalar aplicación" o "Añadir a la pantalla principal".');
+          // Si Chrome/Android no activó la ventana automática, le enseña cómo instalarla manualmente
+          alert('📱 Para instalar la aplicación:\n\n1. Toca el menú de opciones de tu navegador (los 3 puntos ⋮ arriba a la derecha).\n2. Selecciona "Instalar aplicación" o "Añadir a la pantalla principal".');
         }
       });
     }

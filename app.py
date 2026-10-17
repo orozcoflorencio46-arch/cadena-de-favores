@@ -620,7 +620,7 @@ def registro():
         return redirect(url_for('muro'))
 
     # Si se intenta entrar por GET
-    return redirect(url_for('inicio'))
+        return redirect(url_for('inicio'))
    
 @app.route('/muro')
 def muro():

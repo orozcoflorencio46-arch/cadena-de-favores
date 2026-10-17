@@ -312,7 +312,7 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
             <h2 class="text-2xl font-bold text-gray-800">Muro de Necesidades y Apoyos</h2>
         </div>
         <div class="flex items-center gap-2">
-            <!-- Botón de instalación dinámico -->
+            <!-- Botón de instalación dinámico: Inicia oculto para que desaparezca si ya está instalado -->
             <button id="btn-instalar" onclick="manejarInstalacion()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-semibold shadow transition-all text-sm">
                 📱 Instalar App
             </button>
@@ -348,25 +348,25 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
     {% endfor %}
 </div>
 
-<!-- Enlace de Mis Solicitudes con Badge -->
-<a href="/mis-solicitudes" class="relative inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition my-4">
+<!-- HTML de tu botón corregido -->
+<a href="/mis-solicitudes" class="relative inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition">
     Mis Solicitudes
+    
+    <!-- Badge numérico con clases completas -->
     <span id="badge-contador" class="hidden absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
         0
     </span>
 </a>
 
-<!-- Elemento de audio -->
+<!-- Elemento de audio con un tono claro y corto -->
 <audio id="tono-notificacion" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
-<!-- SCRIPT UNIFICADO Y CORREGIDO -->
 <script>
   let cantidadAnterior = 0;
   let primerCarga = true;
-  let deferredPrompt = null;
 
-  // 1. Lógica de Notificaciones
   function actualizarContadorNotificaciones() {
+    // 1. Consultar nuevas solicitudes y notificaciones
     fetch('/api/verificar-nuevas-solicitudes')
       .then(response => response.json())
       .then(data => {
@@ -374,6 +374,7 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
         const tono = document.getElementById('tono-notificacion');
         const cantidadNueva = data.cantidad || 0;
 
+        // Actualizar la insignia visual (badge)
         if (badge) {
           if (cantidadNueva > 0) {
             badge.textContent = cantidadNueva;
@@ -383,6 +384,7 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
           }
         }
 
+        // Si llegaron NUEVAS notificaciones (la cantidad aumentó respecto a la revisión anterior)
         if (cantidadNueva > cantidadAnterior && !primerCarga) {
           if (tono) {
             tono.play().catch(error => {
@@ -397,25 +399,51 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
       .catch(err => console.error("Error consultando notificaciones:", err));
   }
 
-  async function manejarInstalacion() {
-    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    const btnInstalar = document.getElementById('btn-instalar');
+  // Ejecutar la primera vez de inmediato al cargar la página
+  document.addEventListener('DOMContentLoaded', () => {
+    actualizarContadorNotificaciones();
+    // Consultar automáticamente cada 8 segundos
+    setInterval(actualizarContadorNotificaciones, 8000);
+  });
+<script>
+  let deferredPrompt = null;
 
-    if (isIOS) {
-      alert('📱 Para instalar en tu iPhone:\n\n1. Toca el botón de Compartir (⬆️) en Safari.\n2. Selecciona "Añadir a pantalla de inicio".');
-    } else if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted' && btnInstalar) {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    
+    // Si el navegador avisa que se puede instalar y NO está en modo standalone, mostramos el botón
+    const btnInstalar = document.getElementById('btn-instalar');
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    if (btnInstalar && !isStandalone) {
+      btnInstalar.classList.remove('hidden');
+    }
+  });
+
+  // Comprobar al cargar la página si ya está instalada para ocultarlo permanentemente
+  document.addEventListener('DOMContentLoaded', () => {
+    const btnInstalar = document.getElementById('btn-instalar');
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+    if (isStandalone) {
+      // Si la app ya está instalada, ocultamos el botón por completo
+      if (btnInstalar && btnInstalar) {
         btnInstalar.classList.add('hidden');
         btnInstalar.style.display = 'none';
       }
-      deferredPrompt = null;
+    } else if (isIOS) {
+      // En iPhone siempre mostramos la guía de instalación ya que iOS no tiene eventos automáticos
+      if (btnInstalar) {
+        btnInstalar.classList.remove('hidden');
+      }
     } else {
-      alert('📱 Para instalar en tu dispositivo:\n\nToca los tres puntos (⋮) en la esquina superior derecha de tu navegador y selecciona "Instalar aplicación".');
+      // En Android, por defecto lo mostramos para permitir el acceso directo o guiar por los tres puntos
+      if (btnInstalar) {
+        btnInstalar.classList.remove('hidden');
+      }
     }
-  }
-</script>
+  }); 
 
 <!-- Banner guía para instalar en iPhone (iOS) -->
 <div id="iosInstallBanner" class="hidden fixed bottom-4 left-4 right-4 bg-slate-800 border border-slate-700 text-white p-4 rounded-2xl shadow-2xl z-50 flex items-center justify-between gap-3">

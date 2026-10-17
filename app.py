@@ -227,6 +227,7 @@ REGISTRO_TEMPLATE = BASE_TEMPLATE + """
     <!-- Pie del formulario c """ 
 
 MURO_TEMPLATE = BASE_TEMPLATE + """
+{% if mostrar_modal %}
 <!-- Modal de Compromiso Personal -->
 <div id="modalCompromiso" class="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-50 flex items-center justify-center p-4 cursor-pointer select-none">
     <div class="bg-slate-800 border border-slate-700 max-w-lg w-full rounded-2xl p-6 sm:p-8 shadow-2xl text-center transform transition-all duration-300 scale-100">
@@ -238,7 +239,7 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
         </h2>
 
         <!-- Cuerpo del Mensaje -->
-        <div class="space-y-4 text-slate-300 text-sm sm:text-base leading-relaxed text-justify mb-6>
+        <div class="space-y-4 text-slate-300 text-sm sm:text-base leading-relaxed text-justify mb-6">
             <p>
                 Al recibir apoyo, me comprometo conmigo mismo a seguir esta cadena y ayudar a alguien más cuando esté dentro de mis posibilidades.
             </p>
@@ -264,6 +265,24 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
         </p>
     </div>
 </div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('modalCompromiso');
+    if (!modal) return;
+    
+    modal.addEventListener('click', function() {
+      modal.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+      setTimeout(function() {
+        modal.style.display = 'none';
+      }, 300);
+    });
+  });
+</script>
+{% endif %}
+
+<!-- Resto de tu diseño del muro -->
+...
 
 <script>
   document.addEventListener('DOMContentLoaded', function() {
@@ -629,6 +648,10 @@ def logout():
 def muro():
     if 'usuario_id' not in session:
         return redirect(url_for('registro'))
+    
+    mostrar_modal = session.get('mostrar_compromiso', False)
+    if mostrar_modal:
+        session['mostrar_compromiso'] = False
     
     # 1. Eliminar publicaciones de más de 3 días que no han sido completadas
     limite_tiempo = datetime.now() - timedelta(days=3)

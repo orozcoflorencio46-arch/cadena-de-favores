@@ -567,7 +567,7 @@ def logout():
     session.clear()
     return redirect(url_for('inicio'))
 
-   @app.route('/compromiso')
+   @app.route('compromiso')
 def compromiso():
     if 'usuario_id' not in session:
         return redirect(url_for('inicio'))

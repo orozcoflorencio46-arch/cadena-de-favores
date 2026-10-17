@@ -589,7 +589,7 @@ def registro():
                 'El número de carnet debe contener exactamente 7 dígitos numéricos.',
                 'error',
             )
-            return redirect(url_for('inicio'))
+            return redirect(url_for('registro'))
 
         # Verificar si el carnet ya está registrado
     carnet_existente = Usuario.query.filter_by(carnet=carnet).first()
@@ -598,7 +598,7 @@ def registro():
         # Validación de seguridad: Comparamos si el correo ingresado coincide con el del dueño del carnet
         if carnet_existente.correo.strip().lower() != correo.strip().lower():
             flash('Este número de carnet ya pertenece a otro usuario y los datos no coinciden.', 'error')
-            return redirect(url_for('inicio')) # O la ruta donde manejas el formulario
+            return redirect(url_for('registro')) # O la ruta donde manejas el formulario
         
         # Si el carnet y el correo coinciden, es el dueño legítimo ingresando de nuevo
         session['usuario_id'] = carnet_existente.id
@@ -620,7 +620,7 @@ def registro():
         return redirect(url_for('muro'))
 
     # Si se intenta entrar por GET
-        return redirect(url_for('inicio'))
+        return redirect(url_for('registro'))
    
 @app.route('/muro')
 def muro():

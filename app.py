@@ -1,5 +1,29 @@
 from flask import Flask, render_template_string, request, redirect, url_for, session,flash,jsonify,send_file
 from flask_sqlalchemy import SQLAlchemy 
+from functools import wraps
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'usuario_id' not in session:
+            flash("Por favor inicia sesión para continuar.", "warning")
+            return redirect(url_for('inicio'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Objeto para simular current_user con tu base de datos actual
+class CurrentUserProxy:
+    @property
+    def id(self):
+        return session.get('usuario_id')
+    @property
+    def nombre(self):
+        if 'usuario_id' in session:
+            user = Usuario.query.get(session['usuario_id'])
+            return user.nombre if user else ""
+        return ""
+
+current_user = CurrentUserProxy()
 from datetime import datetime, timedelta
 from sqlalchemy.exc import IntegrityError
 import qrcode
@@ -376,61 +400,51 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
 </script>
 
 <!-- Botón de Instalación Personalizado -->
-<button id="btn-instalar" onclick="manejarInstalacion()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg shadow-md font-medium transition cursor-pointer">
-    📱 Instalar Aplicación
+<button id="btn-instalar" onclick="manejarInstalacion()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-semibold shadow-md transition-all">
+  📱 Instalar Aplicación
 </button>
 
 <script>
   let deferredPrompt = null;
 
+  // Capturar el evento de instalación para Android
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
   });
 
+  // Comprobar si la app ya está instalada al cargar la página
   document.addEventListener('DOMContentLoaded', function() {
     const btnInstalar = document.getElementById('btn-instalar');
-    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    
-    // Detectar si la app ya está instalada (en modo standalone)
     const isInStandaloneMode = ('standalone' in window.navigator) && (window.navigator.standalone);
     const isPWAActive = window.matchMedia('(display-mode: standalone)').matches || isInStandaloneMode;
 
-    if (btnInstalar) {
-      // Si la app YA está instalada, ocultamos el botón inmediatamente
-      if (isPWAActive) {
-        btnInstalar.classList.add('hidden');
-        btnInstalar.classList.remove('flex');
-        return; // Detenemos la ejecución aquí para que no aparezca
-      }
-
-      // Si no está instalada, se muestra de forma normal
-      btnInstalar.classList.remove('hidden');
-      btnInstalar.classList.add('flex');
-
-      btnInstalar.addEventListener('click', async () => {
-        if (isIOS) {
-          alert('📱 Para instalar la app en tu iPhone:\n\n1. Toca el botón de Compartir (el cuadrado con la flecha hacia arriba ⬆️) en la barra inferior de Safari.\n2. Desliza y selecciona "Añadir a pantalla de inicio".');
-        } else if (deferredPrompt) {
-          deferredPrompt.prompt();
-          const { outcome } = await deferredPrompt.userChoice;
-          if (outcome === 'accepted') {
-            console.log('Usuario instaló la aplicación');
-            btnInstalar.classList.add('hidden');
-          }
-          deferredPrompt = null;
-        } else {
-          alert('📱 Para instalar la aplicación:\n\nAbre el menú de opciones de tu navegador (los tres puntos ⋮ arriba a la derecha) y selecciona "Instalar aplicación" o "Añadir a la pantalla principal".');
-        }
-      });
+    if (btnInstalar && isPWAActive) {
+      // Ocultar el botón si ya está instalada como app
+      btnInstalar.classList.add('hidden');
+      btnInstalar.classList.remove('flex');
     }
   });
 
-  function manejarInstalacion() {
-    // Función de respaldo por si se llama desde el onclick
+  // Función directa y unificada para manejar la instalación en ambos sistemas
+  async function manejarInstalacion() {
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
     const btnInstalar = document.getElementById('btn-instalar');
-    if (btnInstalar) {
-      btnInstalar.click();
+
+    if (isIOS) {
+      alert('📱 Para instalar la app en tu iPhone:\n\n1. Toca el botón de Compartir (el cuadrado con la flecha hacia arriba ⬆️) en la barra inferior de Safari.\n2. Desliza hacia abajo y selecciona "Añadir a pantalla de inicio".');
+    } else if (deferredPrompt) {
+      // Dispara la ventana nativa de instalación en Android
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        console.log('Usuario instaló la aplicación');
+        if (btnInstalar) btnInstalar.classList.add('hidden');
+      }
+      deferredPrompt = null;
+    } else {
+      // Método alternativo manual por si el navegador bloquea el prompt automático
+      alert('📱 Para instalar la aplicación en tu dispositivo:\n\nAbre el menú de opciones de tu navegador (los tres puntos ⋮ arriba a la derecha) y selecciona "Instalar aplicación" o "Añadir a la pantalla principal".');
     }
   }
 </script>

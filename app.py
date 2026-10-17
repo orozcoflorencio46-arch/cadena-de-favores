@@ -352,9 +352,65 @@ if (btnInstalar) {
         }
     });
 }
+<!-- Modal de Compromiso Personal -->
+<div id="modalCompromiso" class="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-50 flex items-center justify-center p-4 cursor-pointer select-none">
+    <div class="bg-slate-800 border border-slate-700 max-w-lg w-full rounded-2xl p-6 sm:p-8 shadow-2xl text-center transform transition-all duration-300 scale-100">
+        
+        <!-- Encabezado Motivacional -->
+        <div class="text-4xl mb-3">🤝</div>
+        <h2 class="text-2xl font-extrabold text-indigo-300 mb-4">
+            Mi compromiso es conmigo.
+        </h2>
+
+        <!-- Cuerpo del Mensaje -->
+        <div class="space-y-4 text-slate-300 text-sm sm:text-base leading-relaxed text-justify mb-6">
+            <p>
+                Al recibir apoyo, me comprometo conmigo mismo a seguir esta cadena y ayudar a alguien más cuando esté dentro de mis posibilidades.
+            </p>
+            <p>
+                Lo hago porque quiero ser consecuente con la solidaridad que hoy recibo. Puedo compartir lo que sé, dedicar un poco de mi tiempo u ofrecer una mano cuando alguien la necesite.
+            </p>
+            <p class="text-center font-bold text-amber-300 text-base sm:text-lg pt-2">
+                💛 Hoy recibo. Mañana puedo ser yo quien ayude.
+            </p>
+        </div>
+
+        <!-- Indicador / Casilla -->
+        <div class="inline-flex items-center gap-3 bg-slate-900/60 px-4 py-3 rounded-xl border border-slate-700/80 mb-4">
+            <input type="checkbox" id="chkCompromiso" class="w-5 h-5 accent-indigo-500 rounded cursor-pointer" checked onclick="event.stopPropagation();">
+            <label for="chkCompromiso" class="text-xs sm:text-sm text-slate-200 font-medium cursor-pointer">
+                Asumo este compromiso personal de pagar el favor hacia adelante.
+            </label>
+        </div>
+
+        <!-- Instrucción de Avance -->
+        <p class="text-xs text-indigo-400 font-semibold animate-pulse mt-2">
+            ✨ Haz clic en cualquier parte de la pantalla para avanzar al muro
+        </p>
+    </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('modalCompromiso');
+    if (!modal) return;
+    
+    // Si ya vio el compromiso en esta sesión, se oculta inmediatamente
+    if (sessionStorage.getItem('compromisoMostrado') === 'true') {
+      modal.style.display = 'none';
+    } else {
+      // Al hacer clic en cualquier parte de la pantalla, avanza al muro
+      modal.addEventListener('click', function() {
+        modal.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+        setTimeout(function() {
+          modal.style.display = 'none';
+        }, 300);
+        sessionStorage.setItem('compromisoMostrado', 'true');
+      });
+    }
+  });
 </script>
 """
-
 NUEVA_PUB_TEMPLATE = BASE_TEMPLATE + """
 <div class="max-w-lg mx-auto bg-white p-6 rounded-lg shadow">
     <h2 class="text-xl font-bold text-white mb-4">Nueva Publicación</h2>
@@ -536,11 +592,18 @@ def registro():
             return redirect(url_for('inicio'))
 
         # Verificar si el carnet ya está registrado
-        carnet_existente = Usuario.query.filter_by(carnet=carnet).first()
-        if carnet_existente:
-            # ¡Solución! Si ya existe, lo logueamos directamente en lugar de rebotarlo
-            session['usuario_id'] = carnet_existente.id
-            return redirect(url_for('muro'))
+    carnet_existente = Usuario.query.filter_by(carnet=carnet).first()
+    
+    if carnet_existente:
+        # Validación de seguridad: Comparamos si el correo ingresado coincide con el del dueño del carnet
+        if carnet_existente.correo.strip().lower() != correo.strip().lower():
+            flash('Este número de carnet ya pertenece a otro usuario y los datos no coinciden.', 'error')
+            return redirect(url_for('inicio')) # O la ruta donde manejas el formulario
+        
+        # Si el carnet y el correo coinciden, es el dueño legítimo ingresando de nuevo
+        session['usuario_id'] = carnet_existente.id
+        session['usuario_nombre'] = carnet_existente.nombre
+        return redirect(url_for('muro'))
 
         # Si es un usuario completamente nuevo, lo creamos y guardamos
         nuevo_usuario = Usuario(

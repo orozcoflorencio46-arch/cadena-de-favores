@@ -238,7 +238,7 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
         </h2>
 
         <!-- Cuerpo del Mensaje -->
-        <div class="space-y-4 text-slate-300 text-sm sm:text-base leading-relaxed text-justify mb-6">
+        <div class="space-y-4 text-slate-300 text-sm sm:text-base leading-relaxed text-justify mb-6>
             <p>
                 Al recibir apoyo, me comprometo conmigo mismo a seguir esta cadena y ayudar a alguien más cuando esté dentro de mis posibilidades.
             </p>
@@ -571,13 +571,17 @@ QR_TEMPLATE = BASE_TEMPLATE + """
 # -------------------------------------------------------------------
 @app.route('/')
 def inicio():
+    # Si ya tiene sesión, va al muro. Si no, muestra el formulario directo aquí
     if 'usuario_id' in session:
         return redirect(url_for('muro'))
     return render_template_string(REGISTRO_TEMPLATE)
 
 @app.route('/registro', methods=['GET', 'POST'])
 def registro():
-    # Si el usuario accede mediante el envío del formulario (POST)
+    # Si entra por GET y ya tiene sesión, lo mandamos al muro
+    if 'usuario_id' in session:
+        return redirect(url_for('muro'))
+        
     if request.method == 'POST':
         nombre = request.form.get('nombre', '').strip()
         correo = request.form.get('correo', '').strip()
@@ -585,29 +589,21 @@ def registro():
         contacto = request.form.get('contacto', '').strip()
         carnet = request.form.get('carnet', '').strip()
 
-        # Validación estricta: debe ser exactamente de 7 dígitos numéricos
         if not carnet.isdigit() or len(carnet) != 7:
-            flash(
-                'El número de carnet debe contener exactamente 7 dígitos numéricos.',
-                'error',
-            )
-            return redirect(url_for('registro'))
+            flash('El número de carnet debe contener exactamente 7 dígitos numéricos.', 'error')
+            return redirect(url_for('inicio'))
 
-        # Verificar si el carnet ya está registrado
         carnet_existente = Usuario.query.filter_by(carnet=carnet).first()
-    
-        if carnet_existente:
-           # Validación de seguridad: Comparamos si el correo ingresado coincide con el del dueño del carnet
-          if carnet_existente.correo.strip().lower() != correo.strip().lower():
-            flash('Este número de carnet ya pertenece a otro usuario y los datos no coinciden.', 'error')
-            return redirect(url_for('registro')) # O la ruta donde manejas el formulario
         
-          # Si el carnet y el correo coinciden, es el dueño legítimo ingresando de nuevo
-          session['usuario_id'] = carnet_existente.id
-          session['usuario_nombre'] = carnet_existente.nombre
-          return redirect(url_for('muro'))
+        if carnet_existente:
+            if carnet_existente.correo.strip().lower() != correo.strip().lower():
+                flash('Este número de carnet ya pertenece a otro usuario y los datos no coinciden.', 'error')
+                return redirect(url_for('inicio'))
+            
+            session['usuario_id'] = carnet_existente.id
+            session['usuario_nombre'] = carnet_existente.nombre
+            return redirect(url_for('muro'))
 
-         # Si es un usuario completamente nuevo, lo creamos y guardamos
         nuevo_usuario = Usuario(
             nombre=nombre,
             correo=correo,
@@ -619,10 +615,15 @@ def registro():
         db.session.commit()
 
         session['usuario_id'] = nuevo_usuario.id
+        session['usuario_nombre'] = nuevo_usuario.nombre
         return redirect(url_for('muro'))
 
-        # Si se intenta entrar por GET
-    return redirect(url_for('registro'))
+    return render_template_string(REGISTRO_TEMPLATE)
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('inicio'))
    
 @app.route('/muro')
 def muro():

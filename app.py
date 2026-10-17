@@ -1,7 +1,6 @@
 from flask import Flask, render_template_string, request, redirect, url_for, session,flash,jsonify,send_file
 from flask_sqlalchemy import SQLAlchemy 
 from functools import wraps
-
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -754,18 +753,45 @@ def nueva_publicacion():
 @login_required
 def solicitar_contacto(id):
     publicacion = Publicacion.query.get_or_404(id)
-    publicacion.estado = 'en_proceso'
+    usuario_actual_id = session.get('usuario_id')
     
-    # 🔔 Notificación para el CREADOR de la publicación
-    mensaje_creador = f"¡El estudiante {current_user.nombre} quiere contactarte para apoyarte con: '{publicacion.titulo}'!"
-    registrar_notificacion(publicacion.usuario_id, mensaje_creador, tipo='contacto')
+    # Evitar que el usuario se solicite a sí mismo
+    if publicacion.usuario_id == usuario_actual_id:
+        flash("No puedes solicitar contacto a tu propia publicación.", "warning")
+        return redirect(url_for('muro'))
 
-    # 🔔 Notificación para el SOLICITANTE (confirmación)
-    mensaje_solicitante = f"Has solicitado contacto para la publicación: '{publicacion.titulo}'."
-    registrar_notificacion(current_user.id, mensaje_solicitante, tipo='info')
+    # 1. CREAR EL REGISTRO DE LA SOLICITUD (¡Esto faltaba para que aparezca en Mis Solicitudes!)
+    existente = SolicitudContacto.query.filter_by(
+        publicacion_id=id, 
+        solicitante_id=usuario_actual_id
+    ).first()
 
-    db.session.commit()
-    flash("Solicitud de contacto enviada.", "success")
+    if not existente:
+        nueva_solicitud = SolicitudContacto(
+            publicacion_id=id,
+            solicitante_id=usuario_actual_id,
+            estado='pendiente'
+        )
+        db.session.add(nueva_solicitud)
+        publicacion.estado = 'en_proceso'
+
+        # Obtener el nombre del usuario actual para la notificación
+        usuario_actual = Usuario.query.get(usuario_actual_id)
+        nombre_usuario = usuario_actual.nombre if usuario_actual else "Un estudiante"
+
+        # 2. Notificación para el CREADOR de la publicación
+        mensaje_creador = f"¡El estudiante {nombre_usuario} quiere contactarte para apoyarte con: '{publicacion.titulo}'!"
+        registrar_notificacion(publicacion.usuario_id, mensaje_creador, tipo='contacto')
+
+        # 3. Notificación para el SOLICITANTE (confirmación)
+        mensaje_solicitante = f"Has solicitado contacto para la publicación: '{publicacion.titulo}'."
+        registrar_notificacion(usuario_actual_id, mensaje_solicitante, tipo='info')
+
+        db.session.commit()
+        flash("¡Solicitud de contacto enviada con éxito!", "success")
+    else:
+        flash("Ya habías enviado una solicitud para esta publicación.", "info")
+
     return redirect(url_for('muro'))
 
 

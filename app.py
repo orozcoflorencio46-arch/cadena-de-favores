@@ -281,10 +281,6 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
 </script>
 {% endif %}
 
-<!-- Resto de tu diseño del muro -->
-...
-
-<script>
   document.addEventListener('DOMContentLoaded', function() {
     const modal = document.getElementById('modalCompromiso');
     if (!modal) return;

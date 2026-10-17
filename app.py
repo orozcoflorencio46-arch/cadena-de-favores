@@ -357,7 +357,7 @@ document.addEventListener('DOMContentLoaded', actualizarContadorNotificaciones);
 </script>
 
 <!-- Botón de Instalación Personalizado -->
-<button id="btn-instalar" class="hidden items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-medium shadow-lg transition-all">
+<button id="btn-instalar" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-medium shadow-lg transition-all">
     📱 Instalar Aplicación
 </button>
 
@@ -373,12 +373,7 @@ document.addEventListener('DOMContentLoaded', actualizarContadorNotificaciones);
     const btnInstalar = document.getElementById('btn-instalar');
     const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
     const isInStandaloneMode = ('standalone' in window.navigator) && (window.navigator.standalone);
-
-    if (btnInstalar) {
-      // Mostramos el botón en todas las plataformas por defecto
-      btnInstalar.classList.remove('hidden');
-      btnInstalar.classList.add('flex');
-
+if (btnInstalar) {
       btnInstalar.addEventListener('click', async () => {
         if (isIOS) {
           // Guía manual para iPhone / Safari
@@ -392,8 +387,8 @@ document.addEventListener('DOMContentLoaded', actualizarContadorNotificaciones);
           }
           deferredPrompt = null;
         } else {
-          // Si el navegador en Android/PC aún no dispara el evento automático
-          alert('💻 Para instalar la aplicación:\n\nAbre el menú de opciones de tu navegador (los tres puntos <b>⋮</b>) y selecciona "Instalar aplicación" o "Añadir a la pantalla principal".');
+          // Si el navegador ya está instalado o no dispara el evento automático
+          alert('💻 Para instalar la aplicación:\n\nAbre el menú de opciones de tu navegador (los tres puntos en la esquina superior) y selecciona "Instalar aplicación" o "Añadir a la pantalla principal".');
         }
       });
     }

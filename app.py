@@ -227,79 +227,6 @@ REGISTRO_TEMPLATE = BASE_TEMPLATE + """
     <!-- Pie del formulario c """ 
 
 MURO_TEMPLATE = BASE_TEMPLATE + """
-{% if mostrar_modal %}
-<!-- Modal de Compromiso Personal -->
-<div id="modalCompromiso" class="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-50 flex items-center justify-center p-4 cursor-pointer select-none">
-    <div class="bg-slate-800 border border-slate-700 max-w-lg w-full rounded-2xl p-6 sm:p-8 shadow-2xl text-center transform transition-all duration-300 scale-100">
-        
-        <!-- Encabezado Motivacional -->
-        <div class="text-4xl mb-3">🤝</div>
-        <h2 class="text-2xl font-extrabold text-indigo-300 mb-4">
-            Mi compromiso es conmigo.
-        </h2>
-
-        <!-- Cuerpo del Mensaje -->
-        <div class="space-y-4 text-slate-300 text-sm sm:text-base leading-relaxed text-justify mb-6">
-            <p>
-                Al recibir apoyo, me comprometo conmigo mismo a seguir esta cadena y ayudar a alguien más cuando esté dentro de mis posibilidades.
-            </p>
-            <p>
-                Lo hago porque quiero ser consecuente con la solidaridad que hoy recibo. Puedo compartir lo que sé, dedicar un poco de mi tiempo u ofrecer una mano cuando alguien la necesite.
-            </p>
-            <p class="text-center font-bold text-amber-300 text-base sm:text-lg pt-2">
-                💛 Hoy recibo. Mañana puedo ser yo quien ayude.
-            </p>
-        </div>
-
-        <!-- Indicador / Casilla -->
-        <div class="inline-flex items-center gap-3 bg-slate-900/60 px-4 py-3 rounded-xl border border-slate-700/80 mb-4">
-            <input type="checkbox" id="chkCompromiso" class="w-5 h-5 accent-indigo-500 rounded cursor-pointer" checked onclick="event.stopPropagation();">
-            <label for="chkCompromiso" class="text-xs sm:text-sm text-slate-200 font-medium cursor-pointer">
-                Asumo este compromiso personal de pagar el favor hacia adelante.
-            </label>
-        </div>
-
-        <!-- Instrucción de Avance -->
-        <p class="text-xs text-indigo-400 font-semibold animate-pulse mt-2">
-            ✨ Haz clic en cualquier parte de la pantalla para avanzar al muro
-        </p>
-    </div>
-</div>
-
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    const modal = document.getElementById('modalCompromiso');
-    if (!modal) return;
-    
-    modal.addEventListener('click', function() {
-      modal.classList.add('opacity-0', 'transition-opacity', 'duration-300');
-      setTimeout(function() {
-        modal.style.display = 'none';
-      }, 300);
-    });
-  });
-</script>
-{% endif %}
-
-  document.addEventListener('DOMContentLoaded', function() {
-    const modal = document.getElementById('modalCompromiso');
-    if (!modal) return;
-    
-    // Si ya vio el compromiso en esta sesión, se oculta inmediatamente
-    if (sessionStorage.getItem('compromisoMostrado') === 'true') {
-      modal.style.display = 'none';
-    } else {
-      // Al hacer clic en cualquier parte de la pantalla, avanza al muro
-      modal.addEventListener('click', function() {
-        modal.classList.add('opacity-0', 'transition-opacity', 'duration-300');
-        setTimeout(function() {
-          modal.style.display = 'none';
-        }, 300);
-        sessionStorage.setItem('compromisoMostrado', 'true');
-      });
-    }
-  });
-</script>
 <div class="flex justify-between items-center mb-6">
     <h2 class="text-2xl font-bold text-white">Muro de Necesidades y Apoyos</h2>
     <a href="{{ url_for('nueva_publicacion') }}" class="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700">+ Publicar</a>
@@ -617,7 +544,7 @@ def registro():
             
             session['usuario_id'] = carnet_existente.id
             session['usuario_nombre'] = carnet_existente.nombre
-            return redirect(url_for('muro'))
+            return redirect(url_for('compromiso'))
 
         nuevo_usuario = Usuario(
             nombre=nombre,
@@ -631,7 +558,7 @@ def registro():
 
         session['usuario_id'] = nuevo_usuario.id
         session['usuario_nombre'] = nuevo_usuario.nombre
-        return redirect(url_for('muro'))
+        return redirect(url_for('compromiso'))
 
     return render_template_string(REGISTRO_TEMPLATE)
 
@@ -639,15 +566,17 @@ def registro():
 def logout():
     session.clear()
     return redirect(url_for('inicio'))
-   
+
+   @app.route('/compromiso')
+def compromiso():
+    if 'usuario_id' not in session:
+        return redirect(url_for('inicio'))
+    return render_template_string(COMPROMISO_TEMPLATE)
+                                  
 @app.route('/muro')
 def muro():
     if 'usuario_id' not in session:
         return redirect(url_for('registro'))
-    
-    mostrar_modal = session.get('mostrar_compromiso', False)
-    if mostrar_modal:
-        session['mostrar_compromiso'] = False
     
     # 1. Eliminar publicaciones de más de 3 días que no han sido completadas
     limite_tiempo = datetime.now() - timedelta(days=3)

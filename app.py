@@ -809,10 +809,6 @@ def imagen_qr():
     buffer.seek(0)
     return send_file(buffer, mimetype="image/png")
 
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('registro'))
 # INICIALIZACIÓN DE TABLAS (Se ejecuta en Render/WSGI)
 # -----------------------------------------------------------------------------
 with app.app_context():

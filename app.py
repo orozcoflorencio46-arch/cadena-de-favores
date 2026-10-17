@@ -327,7 +327,7 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
         <div class="mt-4 pt-3 border-t text-xs text-gray-500 flex justify-between items-center">
             <span>Publicado de forma confidencial</span>
             {% if pub.usuario_id != session['usuario_id'] %}
-                <form action="{{ url_for('solicitar_contacto', pub_id=pub.id) }}" method="POST">
+                <form action="{{ url_for('solicitar_contacto', id=pub.id) }}" method="POST">
                     <button class="bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Solicitar Contacto</button>
                 </form>
             {% else %}

@@ -399,52 +399,59 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
   });
 </script>
 
-<!-- Botón de Instalación Personalizado -->
-<button id="btn-instalar" onclick="manejarInstalacion()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-semibold shadow-md transition-all">
+<!-- Botón de Instalación (Se oculta automáticamente si ya está instalado) -->
+<button id="btn-instalar" onclick="manejarInstalacion()" class="hidden flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-semibold shadow-md transition-all">
   📱 Instalar Aplicación
 </button>
 
 <script>
   let deferredPrompt = null;
 
-  // Capturar el evento de instalación para Android
+  // Capturar el evento de instalación de Android
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
+    // Mostrar el botón cuando el navegador confirme que es instalable
+    const btn = document.getElementById('btn-instalar');
+    if (btn) btn.classList.remove('hidden');
   });
 
-  // Comprobar si la app ya está instalada al cargar la página
-  document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener('DOMContentLoaded', () => {
     const btnInstalar = document.getElementById('btn-instalar');
-    const isInStandaloneMode = ('standalone' in window.navigator) && (window.navigator.standalone);
-    const isPWAActive = window.matchMedia('(display-mode: standalone)').matches || isInStandaloneMode;
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    
+    // Validar si la app ya está instalada (modo PWA independiente)
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
-    if (btnInstalar && isPWAActive) {
-      // Ocultar el botón si ya está instalada como app
-      btnInstalar.classList.add('hidden');
-      btnInstalar.classList.remove('flex');
+    if (isStandalone) {
+      // Si ya está instalada, ocultar el botón permanentemente
+      if (btnInstalar) btnInstalar.classList.add('hidden');
+      return;
+    }
+
+    // Si es iOS (iPhone), mostrar siempre el botón para darle la guía al usuario
+    if (isIOS) {
+      if (btnInstalar) btnInstalar.classList.remove('hidden');
     }
   });
 
-  // Función directa y unificada para manejar la instalación en ambos sistemas
+  // Función única al hacer clic
   async function manejarInstalacion() {
     const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
     const btnInstalar = document.getElementById('btn-instalar');
 
     if (isIOS) {
-      alert('📱 Para instalar la app en tu iPhone:\n\n1. Toca el botón de Compartir (el cuadrado con la flecha hacia arriba ⬆️) en la barra inferior de Safari.\n2. Desliza hacia abajo y selecciona "Añadir a pantalla de inicio".');
+      alert('📱 Para instalar en tu iPhone:\n\n1. Toca el botón de Compartir (⬆️) en Safari.\n2. Selecciona "Añadir a pantalla de inicio".');
     } else if (deferredPrompt) {
-      // Dispara la ventana nativa de instalación en Android
+      // Lanzar el aviso nativo de Android
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        console.log('Usuario instaló la aplicación');
-        if (btnInstalar) btnInstalar.classList.add('hidden');
+      if (outcome === 'accepted' && btnInstalar) {
+        btnInstalar.classList.add('hidden');
       }
       deferredPrompt = null;
     } else {
-      // Método alternativo manual por si el navegador bloquea el prompt automático
-      alert('📱 Para instalar la aplicación en tu dispositivo:\n\nAbre el menú de opciones de tu navegador (los tres puntos ⋮ arriba a la derecha) y selecciona "Instalar aplicación" o "Añadir a la pantalla principal".');
+      alert('📱 Para instalar:\n\nAbre el menú de tu navegador (los tres puntos ⋮ arriba a la derecha) y selecciona "Instalar aplicación".');
     }
   }
 </script>

@@ -357,44 +357,38 @@ document.addEventListener('DOMContentLoaded', actualizarContadorNotificaciones);
 </script>
 
 <!-- Botón de Instalación Personalizado -->
-<button id="btn-instalar" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-medium shadow-lg transition-all">
+<button id="btn-instalar" onclick="manejarInstalacion()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg shadow-md font-medium transition cursor-pointer">
     📱 Instalar Aplicación
 </button>
 
  <script>
   let deferredPrompt = null;
 
-  // Escuchar cuando el navegador activa el instalador automático
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
   });
 
-  document.addEventListener('DOMContentLoaded', function() {
-    const btnInstalar = document.getElementById('btn-instalar');
+  function manejarInstalacion() {
     const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 
-    if (btnInstalar) {
-      btnInstalar.addEventListener('click', async () => {
-        if (isIOS) {
-          // Guía para iPhone (Safari)
-          alert('📱 Para instalar la app en tu iPhone:\n\n1. Toca el botón de Compartir (flecha hacia arriba ⬆️) en Safari.\n2. Selecciona "Añadir a pantalla de inicio".');
-        } else if (deferredPrompt) {
-          // Instalación automática en Android / Chrome cuando está disponible
-          deferredPrompt.prompt();
-          const { outcome } = await deferredPrompt.userChoice;
-          if (outcome === 'accepted') {
-            console.log('Usuario instaló la aplicación');
-            btnInstalar.classList.add('hidden');
-          }
-          deferredPrompt = null;
-        } else {
-          // Si Chrome/Android no activó la ventana automática, le enseña cómo instalarla manualmente
-          alert('📱 Para instalar la aplicación:\n\n1. Toca el menú de opciones de tu navegador (los 3 puntos ⋮ arriba a la derecha).\n2. Selecciona "Instalar aplicación" o "Añadir a la pantalla principal".');
+    if (isIOS) {
+      // Guía clara para iPhone / Safari
+      alert('📱 Para instalar la app en tu iPhone:\n\n1. Toca el botón de Compartir (el cuadrado con la flecha hacia arriba ⬆️) en la barra inferior de Safari.\n2. Desliza y selecciona "Añadir a pantalla de inicio".');
+    } else if (deferredPrompt) {
+      // Instalación automática en Android / Chrome
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then((choiceResult) => {
+        if (choiceResult.outcome === 'accepted') {
+          console.log('Usuario instaló la aplicación');
         }
+        deferredPrompt = null;
       });
+    } else {
+      // Guía manual por si Android/PC no dispara el aviso automático
+      alert('📱 Para instalar la aplicación:\n\nAbre el menú de opciones de tu navegador (los tres puntos ⋮ arriba a la derecha) y selecciona "Instalar aplicación" o "Añadir a la pantalla principal".');
     }
-  });
+  }
 </script>
 
 <!-- Banner guía para instalar en iPhone (iOS) -->

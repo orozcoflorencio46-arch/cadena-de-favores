@@ -361,7 +361,7 @@ document.addEventListener('DOMContentLoaded', actualizarContadorNotificaciones);
     📱 Instalar Aplicación
 </button>
 
- <script>
+<script>
   let deferredPrompt = null;
 
   window.addEventListener('beforeinstallprompt', (e) => {
@@ -369,24 +369,49 @@ document.addEventListener('DOMContentLoaded', actualizarContadorNotificaciones);
     deferredPrompt = e;
   });
 
-  function manejarInstalacion() {
+  document.addEventListener('DOMContentLoaded', function() {
+    const btnInstalar = document.getElementById('btn-instalar');
     const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    
+    // Detectar si la app ya está instalada (en modo standalone)
+    const isInStandaloneMode = ('standalone' in window.navigator) && (window.navigator.standalone);
+    const isPWAActive = window.matchMedia('(display-mode: standalone)').matches || isInStandaloneMode;
 
-    if (isIOS) {
-      // Guía clara para iPhone / Safari
-      alert('📱 Para instalar la app en tu iPhone:\n\n1. Toca el botón de Compartir (el cuadrado con la flecha hacia arriba ⬆️) en la barra inferior de Safari.\n2. Desliza y selecciona "Añadir a pantalla de inicio".');
-    } else if (deferredPrompt) {
-      // Instalación automática en Android / Chrome
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then((choiceResult) => {
-        if (choiceResult.outcome === 'accepted') {
-          console.log('Usuario instaló la aplicación');
+    if (btnInstalar) {
+      // Si la app YA está instalada, ocultamos el botón inmediatamente
+      if (isPWAActive) {
+        btnInstalar.classList.add('hidden');
+        btnInstalar.classList.remove('flex');
+        return; // Detenemos la ejecución aquí para que no aparezca
+      }
+
+      // Si no está instalada, se muestra de forma normal
+      btnInstalar.classList.remove('hidden');
+      btnInstalar.classList.add('flex');
+
+      btnInstalar.addEventListener('click', async () => {
+        if (isIOS) {
+          alert('📱 Para instalar la app en tu iPhone:\n\n1. Toca el botón de Compartir (el cuadrado con la flecha hacia arriba ⬆️) en la barra inferior de Safari.\n2. Desliza y selecciona "Añadir a pantalla de inicio".');
+        } else if (deferredPrompt) {
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          if (outcome === 'accepted') {
+            console.log('Usuario instaló la aplicación');
+            btnInstalar.classList.add('hidden');
+          }
+          deferredPrompt = null;
+        } else {
+          alert('📱 Para instalar la aplicación:\n\nAbre el menú de opciones de tu navegador (los tres puntos ⋮ arriba a la derecha) y selecciona "Instalar aplicación" o "Añadir a la pantalla principal".');
         }
-        deferredPrompt = null;
       });
-    } else {
-      // Guía manual por si Android/PC no dispara el aviso automático
-      alert('📱 Para instalar la aplicación:\n\nAbre el menú de opciones de tu navegador (los tres puntos ⋮ arriba a la derecha) y selecciona "Instalar aplicación" o "Añadir a la pantalla principal".');
+    }
+  });
+
+  function manejarInstalacion() {
+    // Función de respaldo por si se llama desde el onclick
+    const btnInstalar = document.getElementById('btn-instalar');
+    if (btnInstalar) {
+      btnInstalar.click();
     }
   }
 </script>

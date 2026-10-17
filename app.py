@@ -361,49 +361,43 @@ document.addEventListener('DOMContentLoaded', actualizarContadorNotificaciones);
     📱 Instalar Aplicación
 </button>
 
-<script>
+ <script>
   let deferredPrompt = null;
 
-  window.addEventListener('beforeinstallprompt', (e) => {
-    // Previene que Chrome muestre el banner automático predeterminado
+   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    // Muestra tu botón personalizado en Android/PC
-    const btnInstalar = document.getElementById('btn-instalar');
-    if (btnInstalar) {
-      btnInstalar.classList.remove('hidden');
-      btnInstalar.classList.add('flex');
-    }
   });
 
-  // Detección automática para iPhone / iPad (iOS)
   document.addEventListener('DOMContentLoaded', function() {
     const btnInstalar = document.getElementById('btn-instalar');
     const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
     const isInStandaloneMode = ('standalone' in window.navigator) && (window.navigator.standalone);
 
-    // Si es un iPhone y la app no está instalada, forzamos que aparezca el botón
-    if (isIOS && !isInStandaloneMode && btnInstalar) {
+    if (btnInstalar) {
+      // Mostramos el botón en todas las plataformas por defecto
       btnInstalar.classList.remove('hidden');
       btnInstalar.classList.add('flex');
-    }
-if (btnInstalar) {
+
       btnInstalar.addEventListener('click', async () => {
         if (isIOS) {
-          // Instrucción clara y directa para usuarios de iPhone en Safari
+          // Guía manual para iPhone / Safari
           alert('📱 Para instalar la app en tu iPhone:\n\n1. Toca el botón de Compartir (el cuadrado con la flecha hacia arriba ⬆️) en la barra inferior de Safari.\n2. Desliza y selecciona "Añadir a pantalla de inicio".');
         } else if (deferredPrompt) {
-          // Lógica de instalación automática para Android y PC
+          // Instalación automática en Android / Chrome / PC
           deferredPrompt.prompt();
           const { outcome } = await deferredPrompt.userChoice;
           if (outcome === 'accepted') {
             console.log('Usuario aceptó instalar la PWA');
           }
           deferredPrompt = null;
-          btnInstalar.classList.add('hidden');
+        } else {
+          // Si el navegador en Android/PC aún no dispara el evento automático
+          alert('💻 Para instalar la aplicación:\n\nAbre el menú de opciones de tu navegador (los tres puntos <b>⋮</b>) y selecciona "Instalar aplicación" o "Añadir a la pantalla principal".');
         }
       });
     }
+  });
 </script>
 
 <!-- Banner guía para instalar en iPhone (iOS) -->

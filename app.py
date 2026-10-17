@@ -313,7 +313,7 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
         </div>
         <div class="flex items-center gap-2">
             <!-- Botón de instalación dinámico: Inicia oculto para que desaparezca si ya está instalado -->
-            <button id="btn-instalar" onclick="manejarInstalacion()" class="hidden flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-semibold shadow transition-all text-sm">
+            <button id="btn-instalar" onclick="manejarInstalacion()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-semibold shadow transition-all text-sm">
                 📱 Instalar App
             </button>
             <a href="{{ url_for('nueva_publicacion') }}" class="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 font-semibold text-sm">+ Publicar</a>

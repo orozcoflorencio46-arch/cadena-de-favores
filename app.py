@@ -389,6 +389,41 @@ if (btnInstalar) {
         }
     });
 }
+
+<!-- Banner guía para instalar en iPhone (iOS) -->
+<div id="iosInstallBanner" class="hidden fixed bottom-4 left-4 right-4 bg-slate-800 border border-slate-700 text-white p-4 rounded-2xl shadow-2xl z-50 flex items-center justify-between gap-3">
+    <div class="text-xs sm:text-sm leading-relaxed">
+        <span class="font-bold text-indigo-300 block mb-1">📱 Instala la app en tu iPhone:</span>
+        Toca el botón <span class="inline-block bg-slate-700 px-1.5 py-0.5 rounded font-bold">Compartir (⬆️)</span> en Safari y luego selecciona <span class="font-bold text-amber-300">"Añadir a pantalla de inicio"</span>.
+    </div>
+    <button onclick="cerrarBannerIOS()" class="text-slate-400 hover:text-white font-bold px-2 py-1 text-lg">
+        &times;
+    </button>
+</div>
+
+<script>
+  function detectarIOS() {
+    const ua = window.navigator.userAgent;
+    const isIOS = /iphone|ipad|ipod/i.test(ua);
+    // Verifica que sea iOS y que no esté ya instalado como app (modo standalone)
+    const isInStandaloneMode = ('standalone' in window.navigator) && (window.navigator.standalone);
+    
+    return isIOS && !isInStandaloneMode;
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const banner = document.getElementById('iosInstallBanner');
+    // Si es usuario de iPhone y no lo ha cerrado antes en esta sesión:
+    if (detectarIOS() && !sessionStorage.getItem('bannerIOSVisto')) {
+      banner.classList.remove('hidden');
+    }
+  });
+
+  function cerrarBannerIOS() {
+    const banner = document.getElementById('iosInstallBanner');
+    banner.classList.add('hidden');
+    sessionStorage.setItem('bannerIOSVisto', 'true');
+  }
 </script>
 """
 

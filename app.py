@@ -58,12 +58,31 @@ class SolicitudContacto(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     publicacion_id = db.Column(db.Integer, db.ForeignKey('publicacion.id'), nullable=False)
     solicitante_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    estado = db.Column(db.String(20), default='pendiente')  # 'pendiente', 'aceptado', 'rechazado'
+    estado = db.Column(db.String(20), default='pendiente')  # 'pendiente', 'en contacto', 'finalizado'
 
     publicacion = db.relationship('Publicacion', backref='solicitudes')
     solicitante = db.relationship('Usuario', backref='solicitudes_hechas')
     with app.app_context():
         db.create_all()
+
+class Notificacion(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)  # Quien recibe la notificación
+    mensaje = db.Column(db.String(255), nullable=False)
+    tipo = db.Column(db.String(50), default='info')  # 'contacto', 'respuesta', 'cierre'
+    leida = db.Column(db.Boolean, default=False)
+    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+
+    usuario = db.relationship('Usuario', backref=db.backref('notificaciones', lazy=True))
+
+def registrar_notificacion(usuario_id, mensaje, tipo='info'):
+    try:
+        nueva_notif = Notificacion(usuario_id=usuario_id, mensaje=mensaje, tipo=tipo)
+        db.session.add(nueva_notif)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error registrando notificación: {e}")
 # -------------------------------------------------------------------
 # PLANTILLAS HTML EMBEBIDAS (Para ejecutar todo en un solo archivo)
 # -------------------------------------------------------------------
@@ -311,49 +330,49 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
 <audio id="tono-notificacion" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
 <script>
-// Variable para recordar la cantidad anterior
-let cantidadAnterior = 0;
-let primerCarga = true;
+  let cantidadAnterior = 0;
+  let primerCarga = true;
 
-function actualizarContadorNotificaciones() {
+  function actualizarContadorNotificaciones() {
+    // 1. Consultar nuevas solicitudes y notificaciones
     fetch('/api/verificar-nuevas-solicitudes')
-        .then(response => response.json())
-        .then(data => {
-            const badge = document.getElementById('badge-contador');
-            const tono = document.getElementById('tono-notificacion');
-            const cantidadNueva = data.cantidad || 0;
+      .then(response => response.json())
+      .then(data => {
+        const badge = document.getElementById('badge-contador');
+        const tono = document.getElementById('tono-notificacion');
+        const cantidadNueva = data.cantidad || 0;
 
-            if (badge) {
-                if (cantidadNueva > 0) {
-                    badge.textContent = cantidadNueva;
-                    badge.classList.remove('hidden');
-                } else {
-                    badge.classList.add('hidden');
-                }
-            }
+        // Actualizar la insignia visual (badge)
+        if (badge) {
+          if (cantidadNueva > 0) {
+            badge.textContent = cantidadNueva;
+            badge.classList.remove('hidden');
+          } else {
+            badge.classList.add('hidden');
+          }
+        }
 
-            // Si llegaron NUEVAS solicitudes (la cantidad aumentó)
-            if (cantidadNueva > cantidadAnterior && !primerCarga) {
-                if (tono) {
-                    tono.play().catch(error => {
-                        // Los navegadores bloquean el sonido si el usuario no ha interactuado aún con la página
-                        console.log("El navegador bloqueó la reproducción automática del audio:", error);
-                    });
-                }
-            }
+        // Si llegaron NUEVAS notificaciones (la cantidad aumentó respecto a la revisión anterior)
+        if (cantidadNueva > cantidadAnterior && !primerCarga) {
+          if (tono) {
+            tono.play().catch(error => {
+              console.log('El navegador requiere interacción previa para reproducir sonido:', error);
+            });
+          }
+        }
 
-            // Actualizamos el estado
-            cantidadAnterior = cantidadNueva;
-            primerCarga = false;
-        })
-        .catch(error => console.error('Error al obtener notificaciones:', error));
-}
+        cantidadAnterior = cantidadNueva;
+        primerCarga = false;
+      })
+      .catch(err => console.error("Error consultando notificaciones:", err));
+  }
 
-// Consultar cada 10 segundos
-setInterval(actualizarContadorNotificaciones, 10000);
-
-// Consultar al cargar la página
-document.addEventListener('DOMContentLoaded', actualizarContadorNotificaciones);
+  // Ejecutar la primera vez de inmediato al cargar la página
+  document.addEventListener('DOMContentLoaded', () => {
+    actualizarContadorNotificaciones();
+    // Consultar automáticamente cada 8 segundos
+    setInterval(actualizarContadorNotificaciones, 8000);
+  });
 </script>
 
 <!-- Botón de Instalación Personalizado -->
@@ -721,30 +740,39 @@ def nueva_publicacion():
     return render_template_string(NUEVA_PUB_TEMPLATE)
 
 # --- 1. RUTA PARA SOLICITAR CONTACTO ---
-@app.route('/solicitar-contacto/<int:pub_id>', methods=['POST'])
-def solicitar_contacto(pub_id):
-    if 'usuario_id' not in session:
-        return redirect(url_for('registro'))
-        
-    usuario_actual_id = session['usuario_id']
-    publicacion = Publicacion.query.get_or_404(pub_id)
+@app.route('/solicitar_contacto/<int:id>', methods=['POST'])
+@login_required
+def solicitar_contacto(id):
+    publicacion = Publicacion.query.get_or_404(id)
+    publicacion.estado = 'en_proceso'
     
-    # Evitar que el dueño de la publicación se solicite contacto a sí mismo
-    if publicacion.usuario_id != usuario_actual_id:
-        existe = SolicitudContacto.query.filter_by(
-            publicacion_id=pub_id, 
-            solicitante_id=usuario_actual_id
-        ).first()
-        
-        if not existe:
-            nueva_solicitud = SolicitudContacto(
-                publicacion_id=pub_id,
-                solicitante_id=usuario_actual_id,
-                estado='pendiente'
-            )
-            db.session.add(nueva_solicitud)
-            db.session.commit()
-    return redirect(url_for('mis_solicitudes'))
+    # 🔔 Notificación para el CREADOR de la publicación
+    mensaje_creador = f"¡El estudiante {current_user.nombre} quiere contactarte para apoyarte con: '{publicacion.titulo}'!"
+    registrar_notificacion(publicacion.usuario_id, mensaje_creador, tipo='contacto')
+
+    # 🔔 Notificación para el SOLICITANTE (confirmación)
+    mensaje_solicitante = f"Has solicitado contacto para la publicación: '{publicacion.titulo}'."
+    registrar_notificacion(current_user.id, mensaje_solicitante, tipo='info')
+
+    db.session.commit()
+    flash("Solicitud de contacto enviada.", "success")
+    return redirect(url_for('muro'))
+
+
+@app.route('/cerrar_favor/<int:id>', methods=['POST'])
+@login_required
+def cerrar_favor(id):
+    publicacion = Publicacion.query.get_or_404(id)
+    publicacion.estado = 'completada'
+    
+    mensaje = f"El favor '{publicacion.titulo}' ha sido marcado como completado. ¡Gracias por colaborar!"
+    
+    # Notificar al creador de la publicación
+    registrar_notificacion(publicacion.usuario_id, mensaje, tipo='cierre')
+    
+    db.session.commit()
+    flash("Favor marcado como completado.", "info")
+    return redirect(url_for('muro'))
 
 @app.route('/api/verificar-nuevas-solicitudes')
 def verificar_nuevas_solicitudes():

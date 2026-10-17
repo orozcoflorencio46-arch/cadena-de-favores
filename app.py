@@ -428,7 +428,7 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
 
     if (isStandalone) {
       // Si la app ya está instalada, ocultamos el botón por completo
-      if (btnInstalar) {
+      if (btnInstalar && btnInstalar) {
         btnInstalar.classList.add('hidden');
         btnInstalar.style.display = 'none';
       }

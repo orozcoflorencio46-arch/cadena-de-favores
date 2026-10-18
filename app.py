@@ -311,6 +311,7 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
             <h2 class="text-2xl font-bold text-gray-800">Muro de Necesidades y Apoyos</h2>
         </div>
         <div class="flex items-center gap-2">
+
        <!-- Botón de Instalación Informativo -->
 <button id="btn-instalar" onclick="abrirModalInstalacion()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-semibold shadow transition-all text-sm">
     📱 Instalar App
@@ -401,7 +402,7 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
 <!-- Elemento de audio con un tono claro y corto -->
 <audio id="tono-notificacion" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
-<script>
+</script>
   let cantidadAnterior = 0;
   let primerCarga = true;
 
@@ -445,7 +446,7 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
     // Consultar automáticamente cada 8 segundos
     setInterval(actualizarContadorNotificaciones, 8000);
   });
-<script>
+</script>
   function abrirModalInstalacion() {
     const modal = document.getElementById('modal-instalacion');
     if (modal) {
@@ -471,7 +472,7 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
     }
   });
 
-<script>
+</script>
   
 """
 

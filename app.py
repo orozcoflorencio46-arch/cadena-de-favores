@@ -311,10 +311,51 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
             <h2 class="text-2xl font-bold text-gray-800">Muro de Necesidades y Apoyos</h2>
         </div>
         <div class="flex items-center gap-2">
-            <!-- Botón de instalación dinámico: Inicia oculto para que desaparezca si ya está instalado -->
-            <button id="btn-instalar" onclick="manejarInstalacion()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-semibold shadow transition-all text-sm">
-                📱 Instalar App
+       <!-- Botón de Instalación Informativo -->
+<button id="btn-instalar" onclick="abrirModalInstalacion()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-semibold shadow transition-all text-sm">
+    📱 Instalar App
+</button>
+
+<!-- Ventana Modal Informativa (Oculta por defecto) -->
+<div id="modal-instalacion" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+        <h3 class="text-xl font-bold text-gray-800 mb-4">📱 Instala nuestra Red de Apoyo</h3>
+        
+        <div class="space-y-4 text-sm text-gray-600">
+            <div class="bg-indigo-50 p-3 rounded-lg">
+                <p class="font-bold text-indigo-900 mb-1">🤖 Para Android (Google Chrome):</p>
+                <ol class="list-decimal list-inside space-y-1 text-indigo-800">
+                    <li>Toca los tres puntos (<span class="font-bold">⋮</span>) arriba a la derecha.</li>
+                    <li>Selecciona <span class="font-bold">"Instalar aplicación"</span> o <span class="font-bold">"Añadir a pantalla principal"</span>.</li>
+                    <li>Confirma la instalación.</li>
+                </ol>
+            </div>
+
+            <div class="bg-gray-50 p-3 rounded-lg">
+                <p class="font-bold text-gray-900 mb-1">🍎 Para iPhone / iPad (Safari):</p>
+                <ol class="list-decimal list-inside space-y-1 text-gray-700">
+                    <li>Toca el botón de <span class="font-bold">Compartir</span> (cuadrado con flecha <span class="font-bold">⬆️</span>) abajo en Safari.</li>
+                    <li>Desplázate y selecciona <span class="font-bold">"Añadir a pantalla de inicio"</span>.</li>
+                    <li>Pulsa en <span class="font-bold">"Añadir"</span> arriba a la derecha.</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="mt-6 text-right">
+            <button onclick="cerrarModalInstalacion()" class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">
+                Entendido
             </button>
+        </div>
+    </div>
+</div>
+
+<style>
+  @media (display-mode: standalone) {
+    #btn-instalar {
+      display: none !important;
+    }
+  }
+</style>
             <a href="{{ url_for('nueva_publicacion') }}" class="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 font-semibold text-sm">+ Publicar</a>
         </div>
     </div>
@@ -405,80 +446,33 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
     setInterval(actualizarContadorNotificaciones, 8000);
   });
 <script>
-  let deferredPrompt = null;
-
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    
-    // Si el navegador avisa que se puede instalar y NO está en modo standalone, mostramos el botón
-    const btnInstalar = document.getElementById('btn-instalar');
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-    if (btnInstalar && !isStandalone) {
-      btnInstalar.classList.remove('hidden');
+  function abrirModalInstalacion() {
+    const modal = document.getElementById('modal-instalacion');
+    if (modal) {
+      modal.classList.remove('hidden');
     }
-  });
+  }
 
-  // Comprobar al cargar la página si ya está instalada para ocultarlo permanentemente
+  function cerrarModalInstalacion() {
+    const modal = document.getElementById('modal-instalacion');
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+  }
+
+  // Ocultar automáticamente si ya está en modo PWA instalada
   document.addEventListener('DOMContentLoaded', () => {
     const btnInstalar = document.getElementById('btn-instalar');
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 
-    if (isStandalone) {
-      // Si la app ya está instalada, ocultamos el botón por completo
-      if (btnInstalar && btnInstalar) {
-        btnInstalar.classList.add('hidden');
-        btnInstalar.style.display = 'none';
-      }
-    } else if (isIOS) {
-      // En iPhone siempre mostramos la guía de instalación ya que iOS no tiene eventos automáticos
-      if (btnInstalar) {
-        btnInstalar.classList.remove('hidden');
-      }
-    } else {
-      // En Android, por defecto lo mostramos para permitir el acceso directo o guiar por los tres puntos
-      if (btnInstalar) {
-        btnInstalar.classList.remove('hidden');
-      }
-    }
-  }); 
-
-<!-- Banner guía para instalar en iPhone (iOS) -->
-<div id="iosInstallBanner" class="hidden fixed bottom-4 left-4 right-4 bg-slate-800 border border-slate-700 text-white p-4 rounded-2xl shadow-2xl z-50 flex items-center justify-between gap-3">
-    <div class="text-xs sm:text-sm leading-relaxed">
-        <span class="font-bold text-indigo-300 block mb-1">📱 Instala la app en tu iPhone:</span>
-        Toca el botón <span class="inline-block bg-slate-700 px-1.5 py-0.5 rounded font-bold">Compartir (⬆️)</span> en Safari y luego selecciona <span class="font-bold text-amber-300">"Añadir a pantalla de inicio"</span>.
-    </div>
-    <button onclick="cerrarBannerIOS()" class="text-slate-400 hover:text-white font-bold px-2 py-1 text-lg">
-        &times;
-    </button>
-</div>
-
-<script>
-  function detectarIOS() {
-    const ua = window.navigator.userAgent;
-    const isIOS = /iphone|ipad|ipod/i.test(ua);
-    // Verifica que sea iOS y que no esté ya instalado como app (modo standalone)
-    const isInStandaloneMode = ('standalone' in window.navigator) && (window.navigator.standalone);
-    
-    return isIOS && !isInStandaloneMode;
-  }
-
-  document.addEventListener('DOMContentLoaded', function() {
-    const banner = document.getElementById('iosInstallBanner');
-    // Si es usuario de iPhone y no lo ha cerrado antes en esta sesión:
-    if (detectarIOS() && !sessionStorage.getItem('bannerIOSVisto')) {
-      banner.classList.remove('hidden');
+    if (isStandalone && btnInstalar) {
+      btnInstalar.style.display = 'none';
+      btnInstalar.classList.add('hidden');
     }
   });
 
-  function cerrarBannerIOS() {
-    const banner = document.getElementById('iosInstallBanner');
-    banner.classList.add('hidden');
-    sessionStorage.setItem('bannerIOSVisto', 'true');
-  }
-</script>
+<script>
+  
 """
 
 NUEVA_PUB_TEMPLATE = BASE_TEMPLATE + """

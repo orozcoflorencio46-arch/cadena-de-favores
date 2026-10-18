@@ -402,20 +402,21 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
 <!-- Elemento de audio con un tono claro y corto -->
 <audio id="tono-notificacion" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
-</script>
+<script>
   let cantidadAnterior = 0;
   let primerCarga = true;
+  let listaMensajesActuales = [];
 
+  // 1. Notificaciones en tiempo real
   function actualizarContadorNotificaciones() {
-    // 1. Consultar nuevas solicitudes y notificaciones
     fetch('/api/verificar-nuevas-solicitudes')
       .then(response => response.json())
       .then(data => {
         const badge = document.getElementById('badge-contador');
         const tono = document.getElementById('tono-notificacion');
         const cantidadNueva = data.cantidad || 0;
+        listaMensajesActuales = data.mensajes || [];
 
-        // Actualizar la insignia visual (badge)
         if (badge) {
           if (cantidadNueva > 0) {
             badge.textContent = cantidadNueva;
@@ -425,12 +426,9 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
           }
         }
 
-        // Si llegaron NUEVAS notificaciones (la cantidad aumentó respecto a la revisión anterior)
         if (cantidadNueva > cantidadAnterior && !primerCarga) {
           if (tono) {
-            tono.play().catch(error => {
-              console.log('El navegador requiere interacción previa para reproducir sonido:', error);
-            });
+            tono.play().catch(error => console.log('Audio bloqueado:', error));
           }
         }
 
@@ -440,13 +438,7 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
       .catch(err => console.error("Error consultando notificaciones:", err));
   }
 
-  // Ejecutar la primera vez de inmediato al cargar la página
-  document.addEventListener('DOMContentLoaded', () => {
-    actualizarContadorNotificaciones();
-    // Consultar automáticamente cada 8 segundos
-    setInterval(actualizarContadorNotificaciones, 8000);
-  });
-</script>
+  // 2. Control del Modal de Instalación
   function abrirModalInstalacion() {
     const modal = document.getElementById('modal-instalacion');
     if (modal) {
@@ -461,8 +453,12 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
     }
   }
 
-  // Ocultar automáticamente si ya está en modo PWA instalada
+  // 3. Inicialización al cargar la página
   document.addEventListener('DOMContentLoaded', () => {
+    actualizarContadorNotificaciones();
+    setInterval(actualizarContadorNotificaciones, 8000);
+
+    // Ocultar botón si la app ya está instalada en modo standalone
     const btnInstalar = document.getElementById('btn-instalar');
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 
@@ -471,9 +467,7 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
       btnInstalar.classList.add('hidden');
     }
   });
-
 </script>
-  
 """
 
 NUEVA_PUB_TEMPLATE = BASE_TEMPLATE + """

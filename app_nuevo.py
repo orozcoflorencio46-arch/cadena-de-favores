@@ -541,7 +541,7 @@ SOLICITUDES_TEMPLATE = BASE_TEMPLATE + """
           <div>
              {% if sol.estado == 'pendiente' %}
               <!-- El dueño AUTORIZA enviar sus datos de contacto -->
-              <form action="/aceptar-solicitud/{{ sol.id }}" method="POST">
+              <form action="/aceptar-solicitud/{{ sol.publicacion.usuario.nombre }}" method="POST">
                 <button type="submit" class="text-xs bg-green-600 text-white px-3 py-1.5 rounded font-bold hover:bg-green-700">
                   Autorizar y Compartir Datos
                 </button>

@@ -545,16 +545,12 @@ SOLICITUDES_TEMPLATE = BASE_TEMPLATE + """
               </form>
            {% elif sol.estado == 'aceptado' %}
 <div class="mt-2 p-3 bg-green-50 border border-green-200 rounded text-xs">
-    <p class="font-bold text-green-800">✅ ¡Datos de Contacto Autorizados!</p>
+    <p class="font-bold text-green-800">✅ ¡Contacto Autorizado!</p>
     <p class="mt-1">
         <strong>Dueño de la publicación:</strong> {{ sol.publicacion.usuario.nombre }} 
-        - 📞 Teléfono: {{ sol.publicacion.usuario.telefono }}
+        - 📞 Teléfono: {{ sol.publicacion.usuario.contacto }}
     </p>
-    <p class="mt-1">
-        <strong>Tus datos (Solicitante):</strong> {{ sol.solicitante.nombre }} 
-        - 📞 Teléfono: {{ sol.solicitante.telefono }}
-    </p>
-    <p class="text-gray-600 mt-1 italic">Ya puedes comunicarte con el dueño para coordinar el apoyo.</p>
+    <p class="text-gray-600 mt-1 italic">Ya puedes comunicarte para coordinar el apoyo.</p>
 </div>
             {% elif sol.estado == 'brindado' %}
               <form action="/validar-apoyo/{{ sol.id }}" method="POST">

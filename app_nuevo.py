@@ -539,18 +539,22 @@ SOLICITUDES_TEMPLATE = BASE_TEMPLATE + """
             <p class="text-xs text-gray-500 mt-1">Estado: <span class="font-bold text-amber-600">{{ sol.estado }}</span></p>
           </div>
           <div>
-            {% if sol.estado == 'pendiente' %}
+             {% if sol.estado == 'pendiente' %}
+              <!-- El dueño AUTORIZA enviar sus datos de contacto -->
               <form action="/aceptar-solicitud/{{ sol.id }}" method="POST">
-                <button type="submit" class="text-xs bg-green-600 text-white px-3 py-1.5 rounded font-bold hover:bg-green-700">Autorizar Datos</button>
+                <button type="submit" class="text-xs bg-green-600 text-white px-3 py-1.5 rounded font-bold hover:bg-green-700">
+                  Autorizar y Compartir Datos
+                </button>
               </form>
-          {% elif sol.estado == 'aceptado' %}
-              <!-- En este punto el dueño ya aceptó y se comparten los datos de ambos de inmediato -->
-              <div class="mt-2 p-3 bg-green-50 border border-green-200 rounded text-xs">
-                  <p class="font-bold text-green-800">✅ ¡Datos de Contacto Compartidos!</p>
-                  <p class="mt-1"><strong>Dueño de la publicación:</strong> {{ sol.publicacion.usuario.nombre }} — 📞 Teléfono: {{ sol.publicacion.usuario.contacto }}</p>
-                  <p><strong>Persona interesada (Solicitante):</strong> {{ sol.solicitante.nombre }} — 📞 Teléfono: {{ sol.solicitante.contacto }}</p>
-                  <p class="text-gray-600 mt-1 italic">Ambos ya pueden comunicarse para coordinar el apoyo.</p>
-              </div>
+
+              {% elif sol.estado == 'aceptado' %}
+    <!-- En este punto el dueño ya aceptó y se comparten los datos de ambos de inmediato -->
+    <div class="mt-2 p-3 bg-green-50 border border-green-200 rounded text-xs">
+        <p class="font-bold text-green-800">✅ ¡Datos de Contacto Compartidos!</p>
+        <p class="mt-1"><strong>Dueño de la publicación:</strong> {{ sol.publicacion.usuario.nombre }} — 📞 Teléfono: {{ sol.publicacion.usuario.contacto }}</p>
+        <p><strong>Persona interesada (Solicitante):</strong> {{ sol.solicitante.nombre }} — 📞 Teléfono: {{ sol.solicitante.contacto }}</p>
+        <p class="text-gray-600 mt-1 italic">Ambos ya pueden comunicarse para coordinar el apoyo.</p>
+    </div>
             {% elif sol.estado == 'brindado' %}
               <form action="/validar-apoyo/{{ sol.id }}" method="POST">
                 <button type="submit" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded font-bold">Validar Apoyo</button>

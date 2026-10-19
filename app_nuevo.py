@@ -250,12 +250,31 @@ COMPROMISO_TEMPLATE = BASE_TEMPLATE + """
         <div class="text-4xl mb-3">🤝</div>
         <h2 class="text-2xl font-extrabold text-indigo-300 mb-4">Mi compromiso es conmigo.</h2>
         <div class="space-y-4 text-slate-300 text-sm sm:text-base leading-relaxed text-justify mb-6">
-            <p>Al recibir apoyo, me comprometo conmigo mismo a seguir esta cadena y ayudar a alguien más cuando esté dentro de mis posibilidades.</p>
-            <p class="text-center font-bold text-amber-300 text-base sm:text-lg pt-2">💛 Hoy recibo. Mañana puedo ser yo quien ayude.</p>
+        <p>
+        Al recibir apoyo, me comprometo conmigo mismo a seguir esta cadena y ayudar a alguien más cuando esté dentro de mis posibilidades.
+        </p>
+         <p>
+       Lo hago porque quiero ser consecuente con la solidaridad que hoy recibo. Puedo compartir lo que sé, dedicar un poco de mi tiempo u ofrecer una mano cuando alguien la necesite.
+         </p>
+        <p class="text-center font-bold text-amber-300 text-base sm:text-lg pt-2">
+           💛 Hoy recibo. Mañana puedo ser yo quien ayude.
+         </p>
         </div>
-        <p class="text-xs text-indigo-400 font-semibold animate-pulse mt-2">✨ Haz clic en cualquier parte para avanzar al muro</p>
-    </div>
-</div>
+            
+        <!-- Indicador / Casilla -->
+        <div class="inline-flex items-center gap-3 bg-slate-900/60 px-4 py-3 rounded-xl border border-slate-700/80 mb-4">
+        <input type="checkbox" checked class="w-5 h-5 accent-indigo-500 rounded cursor-pointer pointer-events-none">
+        <span class="text-xs sm:text-sm text-slate-200 font-medium">
+          Asumo este compromiso personal de pagar el favor hacia adelante.
+          </span>
+         </div>
+            
+         <!-- Instrucción de Avance -->
+         <p class="text-xs text-indigo-400 font-semibold animate-pulse mt-2">
+          ✨ Haz clic en cualquier parte de la pantalla para avanzar al muro
+        </p>
+     </div>
+ </div>
 """
 
 MURO_TEMPLATE = BASE_TEMPLATE + """

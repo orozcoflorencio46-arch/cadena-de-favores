@@ -146,11 +146,45 @@ BASE_TEMPLATE = """
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#4f46e5">
     <script>
+      // Pega aquí tu llave pública (publicKey) generada en VapidKeys.com
+      const publicVapidKey = "BJvnANoeOraT2AfAKE4rO2pLHrabAwTeA7C5QhrOV1gH6Ghg1u8mo0MwJdS2lrQ73uq6eWAV1UEOJc1kktFNwcw";
+
+      function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+          outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+      }
+
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function() {
-          navigator.serviceWorker.register('/sw.js').then(reg => {
+        window.addEventListener('load', async function() {
+          try {
+            const reg = await navigator.serviceWorker.register('/sw.js');
             console.log('Service Worker registrado con éxito');
-          });
+
+            // Pedir permiso y suscribir para notificaciones con la app cerrada
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted' && publicVapidKey !== "BJvnANoeOraT2AfAKE4rO2pLHrabAwTeA7C5QhrOV1gH6Ghg1u8mo0MwJdS2lrQ73uq6eWAV1UEOJc1kktFNwcw"; 
+              const subscription = await reg.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
+              });
+
+              // Enviar la suscripción a Flask para guardarla en la base de datos
+              await fetch('/api/save-subscription', {
+                method: 'POST',
+                body: JSON.stringify(subscription),
+                headers: { 'content-type': 'application/json' }
+              });
+              console.log('Suscripción push guardada correctamente.');
+            }
+          } catch (err) {
+            console.log('Error en Service Worker o push:', err);
+          }
         });
       }
     </script>
@@ -283,9 +317,55 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
         <h2 class="text-2xl font-bold text-gray-800">Muro de Necesidades y Apoyos</h2>
     </div>
     <div class="flex items-center gap-2">
+        <!-- Botón de Instalación Informativo (Modal) -->
+        <button id="btn-instalar" onclick="abrirModalInstalacion()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-semibold shadow transition-all text-sm">
+            📱 Instalar App
+        </button>
+
+        <!-- Ventana Modal Informativa -->
+        <div id="modal-instalacion" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+            <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">📱 Instala nuestra Red de Apoyo</h3>
+                
+                <div class="space-y-4 text-sm text-gray-600">
+                    <div class="bg-indigo-50 p-3 rounded-lg">
+                        <p class="font-bold text-indigo-900 mb-1">🤖 Para Android (Google Chrome):</p>
+                        <ol class="list-decimal list-inside space-y-1 text-indigo-800">
+                            <li>Toca los tres puntos (<span class="font-bold">⋮</span>) arriba a la derecha.</li>
+                            <li>Selecciona <span class="font-bold">"Instalar aplicación"</span> o <span class="font-bold">"Añadir a pantalla principal"</span>.</li>
+                            <li>Confirma la instalación.</li>
+                        </ol>
+                    </div>
+
+                    <div class="bg-gray-50 p-3 rounded-lg">
+                        <p class="font-bold text-gray-900 mb-1">🍎 Para iPhone / iPad (Safari):</p>
+                        <ol class="list-decimal list-inside space-y-1 text-gray-700">
+                            <li>Toca el botón de <span class="font-bold">Compartir</span> (cuadrado con flecha <span class="font-bold">⬆️</span>) abajo en Safari.</li>
+                            <li>Desplázate y selecciona <span class="font-bold">"Añadir a pantalla de inicio"</span>.</li>
+                            <li>Pulsa en <span class="font-bold">"Añadir"</span> arriba a la derecha.</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="mt-6 text-right">
+                    <button onclick="cerrarModalInstalacion()" class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">
+                        Entendido
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <a href="{{ url_for('nueva_publicacion') }}" class="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 font-semibold text-sm">+ Publicar</a>
     </div>
 </div>
+
+<style>
+  @media (display-mode: standalone) {
+    #btn-instalar {
+      display: none !important;
+    }
+  }
+</style>
 
 <div class="grid md:grid-cols-2 gap-4">
     {% for pub in publicaciones %}
@@ -315,13 +395,17 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
     {% endfor %}
 </div>
 
+<!-- Botón Mis Solicitudes con Badge de Notificaciones dinámico y sonoro -->
 <div class="relative inline-block my-4">
     <a href="/mis-solicitudes" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition font-semibold text-sm">
         📬 Mis Solicitudes
     </a>
-    <span id="badge-contador" class="hidden absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">0</span>
+    <span id="badge-contador" class="hidden absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
+        0
+    </span>
 </div>
 
+<!-- Elemento de audio para las alertas -->
 <audio id="tono-notificacion" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
 <script>
@@ -345,20 +429,42 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
           }
         }
 
+        // Reproducir tono de aviso únicamente si la otra persona realizó una acción o cambio
         if (cantidadNueva > cantidadAnterior && !primerCarga && data.tiene_cambio_externo) {
           if (tono) {
-            tono.play().catch(error => console.log('Audio bloqueado:', error));
+            tono.play().catch(error => {
+              console.log('Audio bloqueado por políticas del navegador:', error);
+            });
           }
         }
+
         cantidadAnterior = cantidadNueva;
         primerCarga = false;
       })
-      .catch(err => console.error("Error:", err));
+      .catch(err => console.error("Error consultando notificaciones:", err));
+  }
+
+  function abrirModalInstalacion() {
+    const modal = document.getElementById('modal-instalacion');
+    if (modal) modal.classList.remove('hidden');
+  }
+
+  function cerrarModalInstalacion() {
+    const modal = document.getElementById('modal-instalacion');
+    if (modal) modal.classList.add('hidden');
   }
 
   document.addEventListener('DOMContentLoaded', () => {
     actualizarContadorNotificaciones();
     setInterval(actualizarContadorNotificaciones, 8000);
+
+    const btnInstalar = document.getElementById('btn-instalar');
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+    if (isStandalone && btnInstalar) {
+      btnInstalar.style.display = 'none';
+      btnInstalar.classList.add('hidden');
+    }
   });
 </script>
 """
@@ -410,11 +516,13 @@ SOLICITUDES_TEMPLATE = BASE_TEMPLATE + """
                 <button type="submit" class="text-xs bg-green-600 text-white px-3 py-1.5 rounded font-bold hover:bg-green-700">Autorizar Datos</button>
               </form>
             {% elif sol.estado == 'aceptado' %}
-              <div class="mt-2 p-3 bg-green-50 border border-green-200 rounded text-xs">
-                  <p class="font-bold text-green-800">✅ Contacto Compartido</p>
-                  <p>📞 Dueño: {{ sol.publicacion.usuario.contacto }}</p>
-                  <p>📞 Solicitante: {{ sol.solicitante.contacto }}</p>
-              </div>
+                <!-- En este punto el dueño ya aceptó y se comparten los datos de ambos de inmediato -->
+                <div class="mt-2 p-3 bg-green-50 border border-green-200 rounded text-xs">
+                    <p class="font-bold text-green-800">✅ ¡Datos de Contacto Compartidos!</p>
+                    <p class="mt-1"><strong>Dueño de la publicación:</strong> {{ sol.publicacion.usuario.nombre }} — 📞 Teléfono: {{ sol.publicacion.usuario.contacto }}</p>
+                    <p><strong>Persona interesada (Solicitante):</strong> {{ sol.solicitante.nombre }} — 📞 Teléfono: {{ sol.solicitante.contacto }}</p>
+                    <p class="text-gray-600 mt-1 italic">Ambos ya pueden comunicarse para coordinar el apoyo.</p>
+                </div>
             {% elif sol.estado == 'brindado' %}
               <form action="/validar-apoyo/{{ sol.id }}" method="POST">
                 <button type="submit" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded font-bold">Validar Apoyo</button>

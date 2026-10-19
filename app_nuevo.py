@@ -1,6 +1,17 @@
-from flask import Flask, render_template_string, request, redirect, url_for, session,flash,jsonify,send_file
+from flask import Flask, render_template_string, request, redirect, url_for, session, flash, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy 
 from functools import wraps
+import json
+import os
+import io
+import qrcode
+from datetime import datetime, timedelta
+
+try:
+    from pywebpush import webpush, WebPushException
+except ImportError:
+    webpush = None
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -10,7 +21,6 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# Objeto para simular current_user con tu base de datos actual
 class CurrentUserProxy:
     @property
     def id(self):
@@ -23,15 +33,9 @@ class CurrentUserProxy:
         return ""
 
 current_user = CurrentUserProxy()
-from datetime import datetime, timedelta
-from sqlalchemy.exc import IntegrityError
-import qrcode
-import io
-import os
 
 app = Flask(__name__)
 app.secret_key = "clave_secreta_para_sesiones_estudiantiles"
-import os
 
 database_url = os.environ.get('DATABASE_URL')
 if database_url and database_url.startswith("postgres://"):
@@ -43,18 +47,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 from sqlalchemy import text
 
-with app.app_context():
-    db.create_all()
-    try:
-        db.session.execute(text('ALTER TABLE usuario ADD COLUMN carnet VARCHAR(7);'))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-    try:
-        db.session.execute(text('ALTER TABLE publicacion ADD COLUMN fecha_creacion TIMESTAMP;'))
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
 # -------------------------------------------------------------------
 # MODELOS DE BASE DE DATOS
 # -------------------------------------------------------------------
@@ -63,9 +55,8 @@ class Usuario(db.Model):
     nombre = db.Column(db.String(100), nullable=False)
     correo = db.Column(db.String(100), unique=True, nullable=False)
     institucion = db.Column(db.String(100), nullable=False)
-    contacto = db.Column(db.String(100), nullable=False)  # Teléfono / Telegram / Alias
-    carnet = db.Column(db.String(7), unique=True, nullable=False) # línea para el carnet de 7 dígitos
-# ----------------------------------------------------
+    contacto = db.Column(db.String(100), nullable=False)
+    carnet = db.Column(db.String(7), unique=True, nullable=False)
 
 class Publicacion(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -73,41 +64,76 @@ class Publicacion(db.Model):
     titulo = db.Column(db.String(150), nullable=False)
     descripcion = db.Column(db.Text, nullable=False)
     materia_area = db.Column(db.String(100), nullable=False)
-    estado = db.Column(db.String(20), default ='activa')# 'activa', 'en_proceso', 'completada' 
+    estado = db.Column(db.String(20), default ='activa') 
     fecha_creacion = db.Column(db.DateTime, default=datetime.now)
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     usuario = db.relationship('Usuario', backref='publicaciones')
+
 class SolicitudContacto(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     publicacion_id = db.Column(db.Integer, db.ForeignKey('publicacion.id'), nullable=False)
     solicitante_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    estado = db.Column(db.String(20), default='pendiente')  # 'pendiente', 'en contacto', 'finalizado'
+    estado = db.Column(db.String(20), default='pendiente')
 
     publicacion = db.relationship('Publicacion', backref='solicitudes')
     solicitante = db.relationship('Usuario', backref='solicitudes_hechas')
-    with app.app_context():
-        db.create_all()
 
 class Notificacion(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)  # Quien recibe la notificación
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     mensaje = db.Column(db.String(255), nullable=False)
-    tipo = db.Column(db.String(50), default='info')  # 'contacto', 'respuesta', 'cierre'
+    tipo = db.Column(db.String(50), default='info')
     leida = db.Column(db.Boolean, default=False)
     fecha = db.Column(db.DateTime, default=datetime.utcnow)
 
     usuario = db.relationship('Usuario', backref=db.backref('notificaciones', lazy=True))
+
+# Modelo nuevo para almacenar las suscripciones push de cada dispositivo
+class PushSubscription(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
+    endpoint = db.Column(db.Text, nullable=False, unique=True)
+    p256dh = db.Column(db.String(255), nullable=False)
+    auth = db.Column(db.String(255), nullable=False)
+
+def enviar_push_externa(usuario_id, titulo, mensaje):
+    if not webpush:
+        return
+    suscripciones = PushSubscription.query.filter_by(usuario_id=usuario_id).all()
+    vapid_private_key = os.environ.get('VAPID_PRIVATE_KEY')
+    vapid_email = os.environ.get('VAPID_EMAIL', 'mailto:admin@cadenadefavores.edu')
+    
+    if not vapid_private_key:
+        return  # Si no hay llaves VAPID configuradas, omite el envío push nativo sin romper la app
+
+    for sub in suscripciones:
+        try:
+            webpush(
+                subscription_info={
+                    "endpoint": sub.endpoint,
+                    "keys": {"p256dh": sub.p256dh, "auth": sub.auth}
+                },
+                data=json.dumps({"title": titulo, "body": mensaje}),
+                vapid_private_key=vapid_private_key,
+                vapid_claims={"sub": vapid_email}
+            )
+        except Exception as ex:
+            print(f"Error enviando push externa: {ex}")
 
 def registrar_notificacion(usuario_id, mensaje, tipo='info'):
     try:
         nueva_notif = Notificacion(usuario_id=usuario_id, mensaje=mensaje, tipo=tipo)
         db.session.add(nueva_notif)
         db.session.commit()
+        
+        # Dispara la notificación push externa hacia el dispositivo (incluso con app cerrada)
+        enviar_push_externa(usuario_id, "Cadena de Favores Estudiantiles", mensaje)
     except Exception as e:
         db.session.rollback()
         print(f"Error registrando notificación: {e}")
+
 # -------------------------------------------------------------------
-# PLANTILLAS HTML EMBEBIDAS (Para ejecutar todo en un solo archivo)
+# PLANTILLAS HTML EMBEBIDAS
 # -------------------------------------------------------------------
 BASE_TEMPLATE = """
 <!DOCTYPE html>
@@ -117,24 +143,22 @@ BASE_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cadena de Favores Estudiantiles</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Enlace al Manifest y Service Worker -->
-        <link rel="manifest" href="/manifest.json">
-        <meta name="theme-color" content="#4f46e5">
-        <script>
-          if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function() {
-              navigator.serviceWorker.register('/sw.js');
-            });
-          }
-        </script>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#4f46e5">
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/sw.js').then(reg => {
+            console.log('Service Worker registrado con éxito');
+          });
+        });
+      }
+    </script>
 </head>
 <body class="bg-slate-900 min-h-screen text-gray-800 relative font-sans">
-
-    <!-- Fondo dinámico con brillo sutil -->
     <div class="fixed inset-0 bg-gradient-to-br from-slate-900 via-indigo-950 to-purple-950 -z-10"></div>
     <div class="fixed top-0 left-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none -z-10"></div>
 
-    <!-- Barra de Navegación -->
     <nav class="bg-slate-900/80 backdrop-blur-md border-b border-white/10 text-white p-4 sticky top-0 z-50">
         <div class="max-w-6xl mx-auto flex justify-between items-center">
             <a href="{{ url_for('muro') }}" class="text-xl font-bold flex items-center gap-2 hover:opacity-90 transition-opacity">
@@ -148,7 +172,6 @@ BASE_TEMPLATE = """
                 </a>
                 
                 {% if 'usuario_id' in session %}
-                    <!-- Botón de Perfil / Cerrar Sesión -->
                     <div class="flex items-center gap-2 pl-3 border-l border-white/20">
                         <span class="text-xs text-indigo-200">Hola, <strong>{{ session.get('usuario_nombre', 'Estudiante') }}</strong></span>
                         <a href="{{ url_for('logout') }}" class="bg-red-500/20 hover:bg-red-500/40 text-red-200 text-xs px-2.5 py-1 rounded-md border border-red-500/30 transition-all">
@@ -160,7 +183,6 @@ BASE_TEMPLATE = """
         </div>
     </nav>
 
-    <!-- Banner Motivacional Superior (Integrado sin tapar el muro) -->
     <div class="max-w-6xl mx-auto px-6 pt-6">
         <div class="bg-gradient-to-r from-indigo-900/60 via-purple-900/60 to-slate-900/60 border border-indigo-500/30 backdrop-blur-md rounded-2xl p-4 text-white shadow-lg flex flex-col md:flex-row items-center justify-between gap-4">
             <div class="flex items-center gap-3">
@@ -170,137 +192,68 @@ BASE_TEMPLATE = """
                     <p class="text-xs text-gray-300">Un pequeño apoyo hoy en el muro puede ser el impulso profesional que tu compañero necesita.</p>
                 </div>
             </div>
-            <div class="hidden sm:flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 text-xs text-indigo-200 whitespace-nowrap">
-                <span>🌟</span> Comunidad Colaborativa
-            </div>
         </div>
     </div>
 
-    <!-- Contenido Principal -->
     <main class="max-w-6xl mx-auto p-6 relative">
+"""
 
-    <!-- Enlace para Android y navegadores PWA -->
-<link rel="manifest" href="/manifest.json">
-
-<!-- Soporte para iPhone (iOS) -->
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Favores">
-<link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3516/3516134.png">
-
-<!-- Registro del Service Worker -->
-<script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-        .then((reg) => console.log('Service Worker listo:', reg.scope))
-        .catch((err) => console.log('Error en Service Worker:', err));
-    });
-  }
-</script>
-    """
 REGISTRO_TEMPLATE = BASE_TEMPLATE + """
 <div class="max-w-md mx-auto my-8 bg-white p-8 rounded-2xl shadow-xl border border-gray-100 transform transition-all hover:shadow-2xl">
-    <!-- Encabezado con Icono y Mensaje Inspiracional -->
     <div class="text-center mb-6">
-        <div class="w-16 h-16 bg-gradient-to-tr from-indigo-500 to-purple-600 text-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg transform hover:scale-105 transition-all">
+        <div class="w-16 h-16 bg-gradient-to-tr from-indigo-500 to-purple-600 text-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
             </svg>
         </div>
         <h2 class="text-3xl font-extrabold text-gray-800 tracking-tight">Acceso Estudiantil</h2>
-        
-        <!-- Banner Motivacional Principal -->
-        <div class="mt-3 p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-left flex items-start gap-3">
-            <span class="text-xl">🤝</span>
-            <p class="text-xs text-indigo-900 leading-relaxed font-medium">
-                <strong class="block text-indigo-700 font-bold mb-0.5">¡Tu conocimiento puede transformar a alguien más!</strong>
-                Únete a la red de colaboración. Hoy compartes una duda o un talento, mañana impulsas el éxito de un compañero.
-            </p>
-        </div>
     </div>
 
-    <!-- Formulario estilizado con llamadas de apoyo -->
     <form method="POST" action="{{ url_for('registro') }}" class="space-y-4">
         <div>
             <label class="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1">Nombre completo</label>
-            <input type="text" name="nombre" required placeholder="Ej. gabriela sofia" 
-                class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none transition-all">
+            <input type="text" name="nombre" required placeholder="Ej. Gabriela Sofía" 
+                class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
         </div>
-
         <div>
             <label class="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1">Correo institucional</label>
             <input type="email" name="correo" required placeholder="estudiante@universidad.edu" 
-                class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none transition-all">
+                class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
         </div>
-
         <div>
             <label class="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1">Institución / Facultad</label>
             <input type="text" name="institucion" required placeholder="Ej. Facultad de Ingeniería" 
-                class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none transition-all">
+                class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
         </div>
-
         <div>
             <label class="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1">Contacto / Teléfono</label>
             <input type="text" name="contacto" required placeholder="+502 5555-5555" 
-                class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white focus:outline-none transition-all">
+                class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
         </div>
-<div class="mb-4">
-    <label class="block text-sm font-medium text-gray-700">Número de Carnet </label>
-    <input type="text" name="carnet" required 
-           maxlength="9" 
-           minlength="1" 
-           pattern="[0-9]{7}" 
-           title="El carnet es erroneo"
-           class="w-full border p-2 rounded mt-1" 
-           placeholder="Ej. 202312374">
-</div>
-        <!-- Botón con Llamado a la Acción (CTA) Motivacional -->
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Número de Carnet</label>
+            <input type="text" name="carnet" required maxlength="7" pattern="[0-9]{7}" title="Debe tener 7 dígitos"
+                   class="w-full border p-2 rounded mt-1" placeholder="Ej. 2023123">
+        </div>
         <button type="submit" 
-            class="w-full mt-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-3 px-4 rounded-xl font-bold shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2">
+            class="w-full mt-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 px-4 rounded-xl font-bold shadow-md hover:opacity-90 transition-all flex items-center justify-center gap-2">
             <span>Iniciar Cadena de Favores</span>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
         </button>
     </form>
-    </main></body></html>.
+</div>
+</main></body></html>
 """ 
+
 COMPROMISO_TEMPLATE = BASE_TEMPLATE + """
 <div id="pantallaCompromiso" onclick="window.location.href='{{ url_for('muro') }}';" class="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center p-4 cursor-pointer select-none">
-    <div class="bg-slate-800 border border-slate-700 max-w-lg w-full rounded-2xl p-6 sm:p-8 shadow-2xl text-center transform transition-all duration-300 scale-100">
-        
-        <!-- Encabezado Motivacional -->
+    <div class="bg-slate-800 border border-slate-700 max-w-lg w-full rounded-2xl p-6 sm:p-8 shadow-2xl text-center">
         <div class="text-4xl mb-3">🤝</div>
-        <h2 class="text-2xl font-extrabold text-indigo-300 mb-4">
-            Mi compromiso es conmigo.
-        </h2>
-
-        <!-- Cuerpo del Mensaje -->
+        <h2 class="text-2xl font-extrabold text-indigo-300 mb-4">Mi compromiso es conmigo.</h2>
         <div class="space-y-4 text-slate-300 text-sm sm:text-base leading-relaxed text-justify mb-6">
-            <p>
-                Al recibir apoyo, me comprometo conmigo mismo a seguir esta cadena y ayudar a alguien más cuando esté dentro de mis posibilidades.
-            </p>
-            <p>
-                Lo hago porque quiero ser consecuente con la solidaridad que hoy recibo. Puedo compartir lo que sé, dedicar un poco de mi tiempo u ofrecer una mano cuando alguien la necesite.
-            </p>
-            <p class="text-center font-bold text-amber-300 text-base sm:text-lg pt-2">
-                💛 Hoy recibo. Mañana puedo ser yo quien ayude.
-            </p>
+            <p>Al recibir apoyo, me comprometo conmigo mismo a seguir esta cadena y ayudar a alguien más cuando esté dentro de mis posibilidades.</p>
+            <p class="text-center font-bold text-amber-300 text-base sm:text-lg pt-2">💛 Hoy recibo. Mañana puedo ser yo quien ayude.</p>
         </div>
-
-        <!-- Indicador / Casilla -->
-        <div class="inline-flex items-center gap-3 bg-slate-900/60 px-4 py-3 rounded-xl border border-slate-700/80 mb-4">
-            <input type="checkbox" checked class="w-5 h-5 accent-indigo-500 rounded cursor-pointer pointer-events-none">
-            <span class="text-xs sm:text-sm text-slate-200 font-medium">
-                Asumo este compromiso personal de pagar el favor hacia adelante.
-            </span>
-        </div>
-
-        <!-- Instrucción de Avance -->
-        <p class="text-xs text-indigo-400 font-semibold animate-pulse mt-2">
-            ✨ Haz clic en cualquier parte de la pantalla para avanzar al muro
-        </p>
+        <p class="text-xs text-indigo-400 font-semibold animate-pulse mt-2">✨ Haz clic en cualquier parte para avanzar al muro</p>
     </div>
 </div>
 """
@@ -311,55 +264,9 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
         <h2 class="text-2xl font-bold text-gray-800">Muro de Necesidades y Apoyos</h2>
     </div>
     <div class="flex items-center gap-2">
-        <!-- Botón de Instalación Informativo (Modal) -->
-        <button id="btn-instalar" onclick="abrirModalInstalacion()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-semibold shadow transition-all text-sm">
-            📱 Instalar App
-        </button>
-
-        <!-- Ventana Modal Informativa -->
-        <div id="modal-instalacion" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-            <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
-                <h3 class="text-xl font-bold text-gray-800 mb-4">📱 Instala nuestra Red de Apoyo</h3>
-                
-                <div class="space-y-4 text-sm text-gray-600">
-                    <div class="bg-indigo-50 p-3 rounded-lg">
-                        <p class="font-bold text-indigo-900 mb-1">🤖 Para Android (Google Chrome):</p>
-                        <ol class="list-decimal list-inside space-y-1 text-indigo-800">
-                            <li>Toca los tres puntos (<span class="font-bold">⋮</span>) arriba a la derecha.</li>
-                            <li>Selecciona <span class="font-bold">"Instalar aplicación"</span> o <span class="font-bold">"Añadir a pantalla principal"</span>.</li>
-                            <li>Confirma la instalación.</li>
-                        </ol>
-                    </div>
-
-                    <div class="bg-gray-50 p-3 rounded-lg">
-                        <p class="font-bold text-gray-900 mb-1">🍎 Para iPhone / iPad (Safari):</p>
-                        <ol class="list-decimal list-inside space-y-1 text-gray-700">
-                            <li>Toca el botón de <span class="font-bold">Compartir</span> (cuadrado con flecha <span class="font-bold">⬆️</span>) abajo en Safari.</li>
-                            <li>Desplázate y selecciona <span class="font-bold">"Añadir a pantalla de inicio"</span>.</li>
-                            <li>Pulsa en <span class="font-bold">"Añadir"</span> arriba a la derecha.</li>
-                        </ol>
-                    </div>
-                </div>
-
-                <div class="mt-6 text-right">
-                    <button onclick="cerrarModalInstalacion()" class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">
-                        Entendido
-                    </button>
-                </div>
-            </div>
-        </div>
-
         <a href="{{ url_for('nueva_publicacion') }}" class="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 font-semibold text-sm">+ Publicar</a>
     </div>
 </div>
-
-<style>
-  @media (display-mode: standalone) {
-    #btn-instalar {
-      display: none !important;
-    }
-  }
-</style>
 
 <div class="grid md:grid-cols-2 gap-4">
     {% for pub in publicaciones %}
@@ -389,17 +296,13 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
     {% endfor %}
 </div>
 
-<!-- Botón Mis Solicitudes con Badge de Notificaciones dinámico y sonoro -->
 <div class="relative inline-block my-4">
     <a href="/mis-solicitudes" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition font-semibold text-sm">
         📬 Mis Solicitudes
     </a>
-    <span id="badge-contador" class="hidden absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
-        0
-    </span>
+    <span id="badge-contador" class="hidden absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">0</span>
 </div>
 
-<!-- Elemento de audio para las alertas -->
 <audio id="tono-notificacion" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
 <script>
@@ -423,49 +326,27 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
           }
         }
 
-        // Reproducir tono de aviso únicamente si la otra persona realizó una acción o cambio
         if (cantidadNueva > cantidadAnterior && !primerCarga && data.tiene_cambio_externo) {
           if (tono) {
-            tono.play().catch(error => {
-              console.log('Audio bloqueado por políticas del navegador:', error);
-            });
+            tono.play().catch(error => console.log('Audio bloqueado:', error));
           }
         }
-
         cantidadAnterior = cantidadNueva;
         primerCarga = false;
       })
-      .catch(err => console.error("Error consultando notificaciones:", err));
-  }
-
-  function abrirModalInstalacion() {
-    const modal = document.getElementById('modal-instalacion');
-    if (modal) modal.classList.remove('hidden');
-  }
-
-  function cerrarModalInstalacion() {
-    const modal = document.getElementById('modal-instalacion');
-    if (modal) modal.classList.add('hidden');
+      .catch(err => console.error("Error:", err));
   }
 
   document.addEventListener('DOMContentLoaded', () => {
     actualizarContadorNotificaciones();
     setInterval(actualizarContadorNotificaciones, 8000);
-
-    const btnInstalar = document.getElementById('btn-instalar');
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-
-    if (isStandalone && btnInstalar) {
-      btnInstalar.style.display = 'none';
-      btnInstalar.classList.add('hidden');
-    }
   });
 </script>
 """
 
 NUEVA_PUB_TEMPLATE = BASE_TEMPLATE + """
 <div class="max-w-lg mx-auto bg-white p-6 rounded-lg shadow">
-    <h2 class="text-xl font-bold text-white mb-4">Nueva Publicación</h2>
+    <h2 class="text-xl font-bold text-gray-800 mb-4">Nueva Publicación</h2>
     <form method="POST" class="space-y-4">
         <div>
             <label class="block text-sm font-medium">¿Qué deseas hacer?</label>
@@ -476,11 +357,11 @@ NUEVA_PUB_TEMPLATE = BASE_TEMPLATE + """
         </div>
         <div>
             <label class="block text-sm font-medium">Materia o Área de Conocimiento:</label>
-            <input type="text" name="materia_area" placeholder="Ej. Cálculo I, Programación, Tutoría de Física" required class="w-full border p-2 rounded mt-1">
+            <input type="text" name="materia_area" placeholder="Ej. Cálculo I, Programación" required class="w-full border p-2 rounded mt-1">
         </div>
         <div>
             <label class="block text-sm font-medium">Título breve:</label>
-            <input type="text" name="titulo" placeholder="Ej. Ayuda con ejercicios de derivadas" required class="w-full border p-2 rounded mt-1">
+            <input type="text" name="titulo" placeholder="Ej. Ayuda con derivadas" required class="w-full border p-2 rounded mt-1">
         </div>
         <div>
             <label class="block text-sm font-medium">Descripción detallada:</label>
@@ -493,12 +374,9 @@ NUEVA_PUB_TEMPLATE = BASE_TEMPLATE + """
 
 SOLICITUDES_TEMPLATE = BASE_TEMPLATE + """
 <h2 class="text-2xl font-bold text-white mb-6">Centro de Comunicación Confidencial</h2>
-
 <div class="space-y-6">
-
-  <!-- 1. SOLICITUDES RECIBIDAS (Para el dueño de la publicación) -->
   <div class="bg-white p-5 rounded-lg shadow">
-    <h3 class="text-lg font-bold mb-3 border-b pb-2">Solicitudes Recibidas (Gente que quiere conectar contigo)</h3>
+    <h3 class="text-lg font-bold mb-3 border-b pb-2">Solicitudes Recibidas</h3>
     {% if recibidas %}
       {% for sol in recibidas %}
         <div class="p-3 border-b last:border-0 flex justify-between items-center">
@@ -509,28 +387,18 @@ SOLICITUDES_TEMPLATE = BASE_TEMPLATE + """
           </div>
           <div>
             {% if sol.estado == 'pendiente' %}
-              <!-- El dueño AUTORIZA enviar sus datos de contacto -->
               <form action="/aceptar-solicitud/{{ sol.id }}" method="POST">
-                <button type="submit" class="text-xs bg-green-600 text-white px-3 py-1.5 rounded font-bold hover:bg-green-700">
-                  Autorizar y Compartir Datos
-                </button>
+                <button type="submit" class="text-xs bg-green-600 text-white px-3 py-1.5 rounded font-bold hover:bg-green-700">Autorizar Datos</button>
               </form>
-
             {% elif sol.estado == 'aceptado' %}
-              <!-- En este punto el dueño ya aceptó y se comparten los datos de ambos de inmediato -->
               <div class="mt-2 p-3 bg-green-50 border border-green-200 rounded text-xs">
-                  <p class="font-bold text-green-800">✅ ¡Datos de Contacto Compartidos!</p>
-                  <p class="mt-1"><strong>Dueño de la publicación:</strong> {{ sol.publicacion.usuario.nombre }} — 📞 Teléfono: {{ sol.publicacion.usuario.contacto }}</p>
-                  <p><strong>Persona interesada (Solicitante):</strong> {{ sol.solicitante.nombre }} — 📞 Teléfono: {{ sol.solicitante.contacto }}</p>
-                  <p class="text-gray-600 mt-1 italic">Ambos ya pueden comunicarse para coordinar el apoyo.</p>
+                  <p class="font-bold text-green-800">✅ Contacto Compartido</p>
+                  <p>📞 Dueño: {{ sol.publicacion.usuario.contacto }}</p>
+                  <p>📞 Solicitante: {{ sol.solicitante.contacto }}</p>
               </div>
-
             {% elif sol.estado == 'brindado' %}
-              <!-- El dueño VALIDA que recibió el apoyo y cierra la publicación -->
               <form action="/validar-apoyo/{{ sol.id }}" method="POST">
-                <button type="submit" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded font-bold hover:bg-blue-700">
-                  Validar Apoyo Recibido
-                </button>
+                <button type="submit" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded font-bold">Validar Apoyo</button>
               </form>
             {% else %}
               <span class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">Completado</span>
@@ -543,47 +411,34 @@ SOLICITUDES_TEMPLATE = BASE_TEMPLATE + """
     {% endif %}
   </div>
 
-  <!-- 2. SOLICITUDES ENVIADAS (Para quien solicitó la ayuda) -->
   <div class="bg-white p-5 rounded-lg shadow">
-    <h3 class="text-lg font-bold mb-3 border-b pb-2">Solicitudes Enviadas por ti</h3>
+    <h3 class="text-lg font-bold mb-3 border-b pb-2">Solicitudes Enviadas</h3>
     {% if enviadas %}
       {% for sol in enviadas %}
         <div class="p-3 border-b last:border-0">
           <p class="font-medium text-sm">Publicación: <strong>{{ sol.publicacion.titulo }}</strong></p>
           <p class="text-xs text-gray-500 mt-1">Estado: <span class="font-bold">{{ sol.estado }}</span></p>
-
           {% if sol.estado == 'aceptado' %}
-            <!-- Se REVELAN los datos de contacto únicamente cuando el dueño autorizó -->
-            <div class="mt-2 p-3 bg-green-50 rounded border border-green-200">
-              <p class="text-xs text-green-800 font-bold mb-1">✅ ¡Contacto Autorizado!</p>
-              <p class="text-xs text-gray-700"><strong>Nombre:</strong> {{ sol.publicacion.usuario.nombre }}</p>
-              <p class="text-xs text-gray-700"><strong>Contacto:</strong> {{ sol.publicacion.usuario.contacto }}</p>
-              
+            <div class="mt-2 p-3 bg-green-50 rounded border border-green-200 text-xs">
+              <p class="text-green-800 font-bold mb-1">✅ Contacto Autorizado: {{ sol.publicacion.usuario.contacto }}</p>
               <form action="/marcar-brindado/{{ sol.id }}" method="POST" class="mt-2">
-                <button type="submit" class="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">
-                  Marcar como Apoyo Brindado
-                </button>
+                <button type="submit" class="text-xs bg-blue-600 text-white px-3 py-1 rounded">Marcar como Apoyo Brindado</button>
               </form>
             </div>
           {% endif %}
         </div>
       {% endfor %}
     {% else %}
-      <p class="text-sm text-gray-500">No has enviado ninguna solicitud aún.</p>
+      <p class="text-sm text-gray-500">No has enviado solicitudes.</p>
     {% endif %}
   </div>
-
 </div>
-</body>
-</html>
 """
 
 QR_TEMPLATE = BASE_TEMPLATE + """
 <div class="text-center bg-white p-8 rounded-lg shadow max-w-md mx-auto">
     <h2 class="text-xl font-bold mb-2">Escanea este Código QR</h2>
-    <p class="text-sm text-gray-600 mb-4">Los estudiantes pueden usar la cámara de su teléfono para ingresar a la plataforma.</p>
     <img src="{{ url_for('imagen_qr') }}" alt="Código QR" class="mx-auto border p-2 rounded">
-    <p class="text-xs text-gray-400 mt-4">Enlace directo de prueba: <a href="{{ url_for('registro') }}" class="text-indigo-600 underline">Ingresar como estudiante</a></p>
 </div>
 """
 
@@ -609,27 +464,16 @@ def registro():
         carnet = request.form.get('carnet', '').strip()
 
         if not carnet.isdigit() or len(carnet) != 7:
-            flash('El número de carnet debe contener exactamente 7 dígitos numéricos.', 'error')
+            flash('El carnet debe tener exactamente 7 dígitos.', 'error')
             return redirect(url_for('inicio'))
 
         carnet_existente = Usuario.query.filter_by(carnet=carnet).first()
-        
         if carnet_existente:
-            if carnet_existente.correo.strip().lower() != correo.strip().lower():
-                flash('Este número de carnet ya pertenece a otro usuario y los datos no coinciden.', 'error')
-                return redirect(url_for('inicio'))
-            
             session['usuario_id'] = carnet_existente.id
             session['usuario_nombre'] = carnet_existente.nombre
             return redirect(url_for('compromiso'))
 
-        nuevo_usuario = Usuario(
-            nombre=nombre,
-            correo=correo,
-            institucion=institucion,
-            contacto=contacto,
-            carnet=carnet
-        )
+        nuevo_usuario = Usuario(nombre=nombre, correo=correo, institucion=institucion, contacto=contacto, carnet=carnet)
         db.session.add(nuevo_usuario)
         db.session.commit()
 
@@ -657,21 +501,14 @@ def muro():
     
     limite_tiempo = datetime.now() - timedelta(days=3)
     try:
-        vencidas = Publicacion.query.filter(
-            Publicacion.fecha_creacion < limite_tiempo,
-            Publicacion.estado != 'completada'
-        ).all()
-        
+        vencidas = Publicacion.query.filter(Publicacion.fecha_creacion < limite_tiempo, Publicacion.estado != 'completada').all()
         for pub in vencidas:
             db.session.delete(pub)
-            
         db.session.commit()
-    except Exception as e:
+    except Exception:
         db.session.rollback()
-        print("Error al eliminar publicaciones vencidas:", e)
 
     publicaciones = Publicacion.query.filter(Publicacion.estado != 'completada').order_by(Publicacion.fecha_creacion.desc()).all()
-    
     return render_template_string(MURO_TEMPLATE, publicaciones=publicaciones, usuario_id=session['usuario_id'])
     
 @app.route('/nueva-publicacion', methods=['GET', 'POST'])
@@ -679,22 +516,16 @@ def nueva_publicacion():
     if 'usuario_id' not in session:
         return redirect(url_for('registro'))
     if request.method == 'POST':
-        tipo = request.form['tipo']
-        materia_area = request.form['materia_area']
-        titulo = request.form['titulo']
-        descripcion = request.form['descripcion']
-
         pub = Publicacion(
-            tipo=tipo,
-            materia_area=materia_area,
-            titulo=titulo,
-            descripcion=descripcion,
+            tipo=request.form['tipo'],
+            materia_area=request.form['materia_area'],
+            titulo=request.form['titulo'],
+            descripcion=request.form['descripcion'],
             usuario_id=session['usuario_id']
         )
         db.session.add(pub)
         db.session.commit()
         return redirect(url_for('muro'))
-
     return render_template_string(NUEVA_PUB_TEMPLATE)
 
 @app.route('/solicitar_contacto/<int:id>', methods=['POST'])
@@ -707,59 +538,26 @@ def solicitar_contacto(id):
         flash("No puedes solicitar contacto a tu propia publicación.", "warning")
         return redirect(url_for('muro'))
 
-    existente = SolicitudContacto.query.filter_by(
-        publicacion_id=id, 
-        solicitante_id=usuario_actual_id
-    ).first()
-
+    existente = SolicitudContacto.query.filter_by(publicacion_id=id, solicitante_id=usuario_actual_id).first()
     if not existente:
-        nueva_solicitud = SolicitudContacto(
-            publicacion_id=id,
-            solicitante_id=usuario_actual_id,
-            estado='pendiente'
-        )
+        nueva_solicitud = SolicitudContacto(publicacion_id=id, solicitante_id=usuario_actual_id, estado='pendiente')
         db.session.add(nueva_solicitud)
         publicacion.estado = 'en_proceso'
 
         usuario_actual = Usuario.query.get(usuario_actual_id)
         nombre_usuario = usuario_actual.nombre if usuario_actual else "Un estudiante"
 
-        # Notificación para el creador
-        mensaje_creador = f"¡El estudiante {nombre_usuario} quiere contactarte para apoyarte con: '{publicacion.titulo}'!"
-        registrar_notificacion(publicacion.usuario_id, mensaje_creador, tipo='contacto')
-
+        registrar_notificacion(publicacion.usuario_id, f"¡{nombre_usuario} quiere contactarte para: '{publicacion.titulo}'!", tipo='contacto')
         db.session.commit()
-        flash("¡Solicitud de contacto enviada con éxito!", "success")
-    else:
-        flash("Ya habías enviado una solicitud para esta publicación.", "info")
-
-    return redirect(url_for('muro'))
-
-@app.route('/cerrar_favor/<int:id>', methods=['POST'])
-@login_required
-def cerrar_favor(id):
-    publicacion = Publicacion.query.get_or_404(id)
-    publicacion.estado = 'completada'
-    
-    mensaje = f"El favor '{publicacion.titulo}' ha sido marcado como completado. ¡Gracias por colaborar!"
-    registrar_notificacion(publicacion.usuario_id, mensaje, tipo='cierre')
-    
-    db.session.commit()
-    flash("Favor marcado como completado.", "info")
+        flash("¡Solicitud enviada con éxito!", "success")
     return redirect(url_for('muro'))
 
 @app.route('/api/verificar-nuevas-solicitudes', methods=['GET'])
 @login_required
 def verificar_nuevas_solicitudes():
     usuario_id = session.get('usuario_id')
-    
-    notificaciones = Notificacion.query.filter_by(
-        usuario_id=usuario_id, 
-        leida=False
-    ).order_by(Notificacion.id.desc()).all()
-    
+    notificaciones = Notificacion.query.filter_by(usuario_id=usuario_id, leida=False).all()
     cambios_externos = [n for n in notificaciones if n.tipo in ['contacto', 'actualizacion', 'proceso', 'cierre']]
-
     return jsonify({
         'cantidad': len(notificaciones),
         'tiene_cambio_externo': len(cambios_externos) > 0,
@@ -768,89 +566,51 @@ def verificar_nuevas_solicitudes():
 
 @app.route('/aceptar-solicitud/<int:sol_id>', methods=['POST'])
 def aceptar_solicitud(sol_id):
-  if 'usuario_id' not in session:
-    return redirect(url_for('inicio'))
+    if 'usuario_id' not in session:
+        return redirect(url_for('inicio'))
+    solicitud = SolicitudContacto.query.get_or_404(sol_id)
+    if solicitud.publicacion.usuario_id != session['usuario_id']:
+        return redirect(url_for('mis_solicitudes'))
 
-  solicitud = SolicitudContacto.query.get_or_404(sol_id)
-
-  if solicitud.publicacion.usuario_id != session['usuario_id']:
-    flash('No tienes permiso para aceptar esta solicitud.', 'error')
+    solicitud.estado = 'aceptado'
+    registrar_notificacion(solicitud.solicitante_id, f"¡{solicitud.publicacion.usuario.nombre} aceptó tu solicitud para '{solicitud.publicacion.titulo}'!", tipo='actualizacion')
+    db.session.commit()
     return redirect(url_for('mis_solicitudes'))
-
-  solicitud.estado = 'aceptado'
-  
-  # Notificar al solicitante que el dueño aceptó
-  mensaje = f"¡{solicitud.publicacion.usuario.nombre} ha autorizado el contacto para '{solicitud.publicacion.titulo}'!"
-  registrar_notificacion(solicitud.solicitante_id, mensaje, tipo='actualizacion')
-
-  db.session.commit()
-
-  flash('¡Solicitud aceptada! Ahora ambos pueden ver sus datos de contacto.', 'success')
-  return redirect(url_for('mis_solicitudes'))
 
 @app.route('/marcar-brindado/<int:sol_id>', methods=['POST'])
 def marcar_brindado(sol_id):
     if 'usuario_id' not in session:
         return redirect(url_for('registro'))
-        
     solicitud = SolicitudContacto.query.get_or_404(sol_id)
-    
     if solicitud.solicitante_id == session['usuario_id']:
         solicitud.estado = 'brindado'
-        
-        # Notificar al dueño que el solicitante marcó el apoyo como brindado
-        mensaje = f"El solicitante ha marcado el apoyo como brindado en '{solicitud.publicacion.titulo}'."
-        registrar_notificacion(solicitud.publicacion.usuario_id, mensaje, tipo='actualizacion')
-
+        registrar_notificacion(solicitud.publicacion.usuario_id, f"El apoyo en '{solicitud.publicacion.titulo}' fue marcado como brindado.", tipo='actualizacion')
         db.session.commit()
-        
     return redirect(url_for('mis_solicitudes'))
 
 @app.route('/validar-apoyo/<int:sol_id>', methods=['POST'])
 def validar_apoyo(sol_id):
     if 'usuario_id' not in session:
         return redirect(url_for('registro'))
-        
     solicitud = SolicitudContacto.query.get_or_404(sol_id)
-    
     if solicitud.publicacion.usuario_id == session['usuario_id']:
         solicitud.estado = 'completado'
         solicitud.publicacion.estado = 'completada'
-        
-        # Notificar al solicitante el cierre exitoso
-        mensaje = f"Se ha validado y cerrado la solicitud para '{solicitud.publicacion.titulo}'."
-        registrar_notificacion(solicitud.solicitante_id, mensaje, tipo='cierre')
-
+        registrar_notificacion(solicitud.solicitante_id, f"Se ha validado y cerrado la solicitud para '{solicitud.publicacion.titulo}'.", tipo='cierre')
         db.session.commit()
-        
     return redirect(url_for('mis_solicitudes'))
 
 @app.route('/mis-solicitudes')
 def mis_solicitudes():
     if 'usuario_id' not in session:
         return redirect(url_for('registro'))
-        
     usuario_id = session['usuario_id']
-    
-    # Marcar notificaciones como leídas al entrar a Mis Solicitudes para limpiar el badge de avisos
     Notificacion.query.filter_by(usuario_id=usuario_id, leida=False).update({'leida': True})
     db.session.commit()
 
-    recibidas = SolicitudContacto.query.join(Publicacion).filter(
-        Publicacion.usuario_id == usuario_id,
-        SolicitudContacto.estado != 'completado'
-    ).all()
-    
-    enviadas = SolicitudContacto.query.filter(
-        SolicitudContacto.solicitante_id == usuario_id,
-        SolicitudContacto.estado != 'completado'
-    ).all()
-    
-    return render_template_string(
-        SOLICITUDES_TEMPLATE, 
-        recibidas=recibidas, 
-        enviadas=enviadas
-    )
+    recibidas = SolicitudContacto.query.join(Publicacion).filter(Publicacion.usuario_id == usuario_id, SolicitudContacto.estado != 'completado').all()
+    enviadas = SolicitudContacto.query.filter(SolicitudContacto.solicitante_id == usuario_id, SolicitudContacto.estado != 'completado').all()
+    return render_template_string(SOLICITUDES_TEMPLATE, recibidas=recibidas, enviadas=enviadas)
 
 @app.route('/qr')
 def generar_qr():
@@ -858,39 +618,28 @@ def generar_qr():
 
 @app.route('/imagen-qr')
 def imagen_qr():
-    url = request.host_url + "registro"
-    img = qrcode.make(url)
+    img = qrcode.make(request.host_url + "registro")
     buffer = io.BytesIO()
     img.save(buffer, format="PNG")
     buffer.seek(0)
     return send_file(buffer, mimetype="image/png")
 
-with app.app_context():
-    db.create_all()
-
 @app.route('/manifest.json')
 def manifest():
     return jsonify({
         "name": "Cadena de Favores Estudiantiles",
-        "short_name": "Cadena de Favores",
+        "short_name": "Favores",
         "start_url": "/muro",
         "display": "standalone",
         "background_color": "#0f172a",
         "theme_color": "#4f46e5",
         "icons": [
-            {
-                "src": "https://cdn-icons-png.flaticon.com/512/3076/3076129.png",
-                "sizes": "192x192",
-                "type": "image/png"
-            },
-            {
-                "src": "https://cdn-icons-png.flaticon.com/512/3076/3076129.png",
-                "sizes": "512x512",
-                "type": "image/png"
-            }
+            {"src": "https://cdn-icons-png.flaticon.com/512/3076/3076129.png", "sizes": "192x192", "type": "image/png"},
+            {"src": "https://cdn-icons-png.flaticon.com/512/3076/3076129.png", "sizes": "512x512", "type": "image/png"}
         ]
     })
 
+# Service Worker actualizado para interceptar eventos push nativos
 @app.route('/sw.js')
 def service_worker():
     sw_code = """
@@ -900,8 +649,42 @@ def service_worker():
     self.addEventListener('activate', (e) => {
         e.waitUntil(clients.claim());
     });
+    
+    // Escucha eventos push del sistema cuando la app está cerrada
+    self.addEventListener('push', function(event) {
+        let data = { title: "Cadena de Favores", body: "Tienes una nueva actualización." };
+        if (event.data) {
+            try {
+                data = event.data.json();
+            } catch (e) {
+                data.body = event.data.text();
+            }
+        }
+        const options = {
+            body: data.body,
+            icon: 'https://cdn-icons-png.flaticon.com/512/3076/3076129.png',
+            vibrate: [200, 100, 200]
+        };
+        event.waitUntil(
+            self.registration.showNotification(data.title, options)
+        );
+    });
+
+    self.addEventListener('notificationclick', function(event) {
+        event.notification.close();
+        event.waitUntil(
+            clients.openWindow('/mis-solicitudes')
+        );
+    });
+
     self.addEventListener('fetch', (e) => {
         e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
     });
     """
     return sw_code, 200, {'Content-Type': 'application/javascript'}
+
+with app.app_context():
+    db.create_all()
+
+if __name__ == '_main_':
+    app.run(debug=True)

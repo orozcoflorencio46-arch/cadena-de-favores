@@ -73,12 +73,10 @@ class SolicitudContacto(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     publicacion_id = db.Column(db.Integer, db.ForeignKey('publicacion.id'), nullable=False)
     solicitante_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    estado = db.Column(db.String(20), default='pendiente')  # 'pendiente', 'en contacto', 'finalizado'
+    estado = db.Column(db.String(20), default='pendiente')  # 'pendiente', 'aceptado', 'brindado', 'completado'
 
     publicacion = db.relationship('Publicacion', backref='solicitudes')
     solicitante = db.relationship('Usuario', backref='solicitudes_hechas')
-    with app.app_context():
-        db.create_all()
 
 class Notificacion(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -90,7 +88,6 @@ class Notificacion(db.Model):
 
     usuario = db.relationship('Usuario', backref=db.backref('notificaciones', lazy=True))
 
-# Modelo nuevo para almacenar las suscripciones push de cada dispositivo
 class PushSubscription(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
@@ -103,10 +100,10 @@ def enviar_push_externa(usuario_id, titulo, mensaje):
         return
     suscripciones = PushSubscription.query.filter_by(usuario_id=usuario_id).all()
     vapid_private_key = os.environ.get('VAPID_PRIVATE_KEY')
-    vapid_email = os.environ.get('VAPID_EMAIL', 'mailto:admin@cadenadefavores.edu')
+    vapid_email = os.environ.get('VAPID_EMAIL', 'mailto:orozcoflorencio46@gmail.com')
     
     if not vapid_private_key:
-        return  # Si no hay llaves VAPID configuradas, omite el envío push nativo sin romper la app
+        return
 
     for sub in suscripciones:
         try:
@@ -127,8 +124,6 @@ def registrar_notificacion(usuario_id, mensaje, tipo='info'):
         nueva_notif = Notificacion(usuario_id=usuario_id, mensaje=mensaje, tipo=tipo)
         db.session.add(nueva_notif)
         db.session.commit()
-        
-        # Dispara la notificación push externa hacia el dispositivo (incluso con app cerrada)
         enviar_push_externa(usuario_id, "Cadena de Favores Estudiantiles", mensaje)
     except Exception as e:
         db.session.rollback()
@@ -148,7 +143,6 @@ BASE_TEMPLATE = """
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#4f46e5">
     <script>
-     // Pega aquí tu llave pública (publicKey) generada en VapidKeys.com
 const publicVapidKey = "BJvnANoeOraT2AfAKE4rO2pLHrabAwTeA7C5QhrOV1gH6Ghg1u8mo0MwJdS2lrQ73uq6eWAV1UEOJc1kktFNwcw";
 
 function urlBase64ToUint8Array(base64String) {
@@ -166,6 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnPush = document.getElementById('btn-activar-push');
     if (btnPush) {
         btnPush.addEventListener('click', async () => {
+            console.log("Iniciando suscripción a notificaciones...");
             if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
                 alert("Tu navegador no soporta notificaciones push.");
                 return;
@@ -202,7 +197,42 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    { if 'usuario_id' in session %}
+    setInterval(async () => {
+        try {
+            const res = await fetch('/api/verificar-nuevas-solicitudes');
+            const data = await res.json();
+            const badge = document.getElementById('badge-contador');
+            const audio = document.getElementById('tono-notificacion');
+            
+            if (data.cantidad > 0) {
+                if (badge) {
+                    badge.innerText = data.cantidad;
+                    badge.classList.remove('hidden');
+                }
+                if (data.tiene_cambio_externo && audio) {
+                    audio.play().catch(e => console.log("Audio bloqueado por navegador hasta interacción previa"));
+                }
+            } else if (badge) {
+                badge.classList.add('hidden');
+            }
+        } catch (err) {
+            console.error("Error consultando notificaciones:", err);
+        }
+    }, 10000);
+    { endif %}
 });
+
+function abrirModalInstalacion() {
+    const modal = document.getElementById('modal-instalacion');
+    if(modal) modal.classList.remove('hidden');
+}
+
+function cerrarModalInstalacion() {
+    const modal = document.getElementById('modal-instalacion');
+    if(modal) modal.classList.add('hidden');
+}
     </script>
 </head>
 <body class="bg-slate-900 min-h-screen text-gray-800 relative font-sans">
@@ -221,14 +251,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     + Publicar
                 </a>
                 
-                {% if 'usuario_id' in session %}
+                { if 'usuario_id' in session %}
                     <div class="flex items-center gap-2 pl-3 border-l border-white/20">
                         <span class="text-xs text-indigo-200">Hola, <strong>{{ session.get('usuario_nombre', 'Estudiante') }}</strong></span>
                         <a href="{{ url_for('logout') }}" class="bg-red-500/20 hover:bg-red-500/40 text-red-200 text-xs px-2.5 py-1 rounded-md border border-red-500/30 transition-all">
                             Cerrar Sesión
                         </a>
                     </div>
-                {% endif %}
+                { endif %}
             </div>
         </div>
     </nav>
@@ -244,6 +274,8 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         </div>
     </div>
+
+    <audio id="tono-notificacion" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
     <main class="max-w-6xl mx-auto p-6 relative">
 """
@@ -311,7 +343,6 @@ COMPROMISO_TEMPLATE = BASE_TEMPLATE + """
          </p>
         </div>
             
-        <!-- Indicador / Casilla -->
         <div class="inline-flex items-center gap-3 bg-slate-900/60 px-4 py-3 rounded-xl border border-slate-700/80 mb-4">
         <input type="checkbox" checked class="w-5 h-5 accent-indigo-500 rounded cursor-pointer pointer-events-none">
         <span class="text-xs sm:text-sm text-slate-200 font-medium">
@@ -319,7 +350,6 @@ COMPROMISO_TEMPLATE = BASE_TEMPLATE + """
           </span>
          </div>
             
-         <!-- Instrucción de Avance -->
          <p class="text-xs text-indigo-400 font-semibold animate-pulse mt-2">
           ✨ Haz clic en cualquier parte de la pantalla para avanzar al muro
         </p>
@@ -333,12 +363,10 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
         <h2 class="text-2xl font-bold text-gray-800">Muro de Necesidades y Apoyos</h2>
     </div>
     <div class="flex items-center gap-2">
-        <!-- Botón de Instalación Informativo (Modal) -->
         <button id="btn-instalar" onclick="abrirModalInstalacion()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-semibold shadow transition-all text-sm">
             📱 Instalar App
         </button>
 
-        <!-- Ventana Modal Informativa -->
         <div id="modal-instalacion" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
             <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
                 <h3 class="text-xl font-bold text-gray-800 mb-4">📱 Instala nuestra Red de Apoyo</h3>
@@ -411,7 +439,6 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
     {% endfor %}
 </div>
 
-<!-- Botón Mis Solicitudes con Badge de Notificaciones dinámico y sonoro -->
 <div class="relative inline-block my-4">
     <a href="/mis-solicitudes" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition font-semibold text-sm">
         📬 Mis Solicitudes
@@ -421,82 +448,11 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
     </span>
 </div>
 
-<!-- Elemento de audio para las alertas -->
-<audio id="tono-notificacion" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
-
-<!-- Botón en tu HTML (sin onclick inline) -->
-<button id="btn-activar-push" class="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow font-medium my-2">
-    🔔 Activar Notificaciones Push
-</button>
-
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    const btnPush = document.getElementById('btn-activar-push');
-    if (btnPush) {
-        btnPush.addEventListener('click', async () => {
-            console.log("Botón presionado, iniciando registro...");
-
-            if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-                alert("Tu navegador no soporta notificaciones push.");
-                return;
-            }
-
-            try {
-                // 1. Registrar el Service Worker
-                const reg = await navigator.serviceWorker.register('/sw.js');
-                console.log('Service Worker registrado:', reg);
-
-                // 2. Pedir permiso formalmente
-                const permission = await Notification.requestPermission();
-                console.log('Permiso obtenido:', permission);
-
-                if (permission !== 'granted') {
-                    alert("El permiso de notificaciones fue denegado.");
-                    return;
-                }
-
-                // Tu llave pública VAPID
-                const publicVapidKey = 'B3vnAlosOraT2AfAKE4r02pLHrabAwA7CSQhrOV1gHGhgIu0MoWJds21rQ73uq6eWAV1UEOJc1kktFNwcW';
-
-                // 3. Suscribir el dispositivo
-                const subscription = await reg.pushManager.subscribe({
-                    userVisibleOnly: true,
-                    applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
-                });
-                console.log('Suscripción push creada con éxito.');
-
-                // 4. Enviar los datos al servidor Flask
-                const response = await fetch('/api/save-subscription', {
-                    method: 'POST',
-                    body: JSON.stringify(subscription),
-                    headers: { 'Content-Type': 'application/json' }
-                });
-
-                if (response.ok) {
-                    alert("¡Notificaciones activadas y guardadas correctamente!");
-                } else {
-                    alert("Hubo un error al guardar la suscripción en el servidor.");
-                }
-
-            } catch (error) {
-                console.error('Error detallado:', error);
-                alert("Error al activar: " + error.message);
-            }
-        });
-    }
-});
-
-function urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-        outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
-}
-</script>
+<div class="my-2">
+    <button id="btn-activar-push" class="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow font-medium">
+        🔔 Activar Notificaciones Push
+    </button>
+</div>
 """
 
 NUEVA_PUB_TEMPLATE = BASE_TEMPLATE + """
@@ -542,7 +498,6 @@ SOLICITUDES_TEMPLATE = BASE_TEMPLATE + """
           </div>
           <div>
              {% if sol.estado == 'pendiente' %}
-              <!-- El dueño AUTORIZA enviar sus datos de contacto -->
               <form action="/aceptar-solicitud/{{ sol.id }}" method="POST">
                 <button type="submit" class="text-xs bg-green-600 text-white px-3 py-1.5 rounded font-bold hover:bg-green-700">
                   Autorizar y Compartir Datos
@@ -550,13 +505,12 @@ SOLICITUDES_TEMPLATE = BASE_TEMPLATE + """
               </form>
 
               {% elif sol.estado == 'aceptado' %}
-    <!-- En este punto el dueño ya aceptó y se comparten los datos de ambos de inmediato -->
-    <div class="mt-2 p-3 bg-green-50 border border-green-200 rounded text-xs">
-        <p class="font-bold text-green-800">✅ ¡Datos de Contacto Compartidos!</p>
-        <p class="mt-1"><strong>Dueño de la publicación:</strong> {{ sol.publicacion.usuario.nombre }} — 📞 Teléfono: {{ sol.publicacion.usuario.contacto }}</p>
-        <p><strong>Persona interesada (Solicitante):</strong> {{ sol.solicitante.nombre }} — 📞 Teléfono: {{ sol.solicitante.contacto }}</p>
-        <p class="text-gray-600 mt-1 italic">Ambos ya pueden comunicarse para coordinar el apoyo.</p>
-    </div>
+              <div class="mt-2 p-3 bg-green-50 border border-green-200 rounded text-xs">
+                  <p class="font-bold text-green-800">✅ ¡Datos de Contacto Compartidos!</p>
+                  <p class="mt-1"><strong>Dueño de la publicación:</strong> {{ sol.publicacion.usuario.nombre }} — 📞 Teléfono: {{ sol.publicacion.usuario.contacto }}</p>
+                  <p><strong>Persona interesada (Solicitante):</strong> {{ sol.solicitante.nombre }} — 📞 Teléfono: {{ sol.solicitante.contacto }}</p>
+                  <p class="text-gray-600 mt-1 italic">Ambos ya pueden comunicarse para coordinar el apoyo.</p>
+              </div>
               
             {% elif sol.estado == 'brindado' %}
               <form action="/validar-apoyo/{{ sol.id }}" method="POST">
@@ -582,7 +536,11 @@ SOLICITUDES_TEMPLATE = BASE_TEMPLATE + """
           <p class="text-xs text-gray-500 mt-1">Estado: <span class="font-bold">{{ sol.estado }}</span></p>
           {% if sol.estado == 'aceptado' %}
             <div class="mt-2 p-3 bg-green-50 rounded border border-green-200 text-xs">
-              <p class="text-green-800 font-bold mb-1">✅ Contacto Autorizado: {{ sol.publicacion.usuario.contacto }}</p>
+              <p class="font-bold text-green-800">✅ ¡Datos de Contacto Compartidos!</p>
+              <p class="mt-1"><strong>Dueño de la publicación:</strong> {{ sol.publicacion.usuario.nombre }} — 📞 Teléfono: {{ sol.publicacion.usuario.contacto }}</p>
+              <p><strong>Tus datos (Solicitante):</strong> {{ sol.solicitante.nombre }} — 📞 Teléfono: {{ sol.solicitante.contacto }}</p>
+              <p class="text-gray-600 mt-1 italic">Ambos ya pueden comunicarse para coordinar el apoyo.</p>
+              
               <form action="/marcar-brindado/{{ sol.id }}" method="POST" class="mt-2">
                 <button type="submit" class="text-xs bg-blue-600 text-white px-3 py-1 rounded">Marcar como Apoyo Brindado</button>
               </form>
@@ -669,9 +627,7 @@ def save_subscription():
     endpoint = sub_data.get('endpoint')
     keys = sub_data.get('keys', {})
     
-    # Comprobar si ya existe la suscripción para este endpoint
     existente = PushSubscription.query.filter_by(endpoint=endpoint).first()
-    
     if not existente:
         nueva_sub = PushSubscription(
             usuario_id=usuario_id,
@@ -683,6 +639,7 @@ def save_subscription():
         db.session.commit()
     
     return jsonify({'success': True}), 200                                 
+
 @app.route('/muro')
 def muro():
     if 'usuario_id' not in session:
@@ -744,15 +701,14 @@ def solicitar_contacto(id):
 @app.route('/api/verificar-nuevas-solicitudes', methods=['GET'])
 @login_required
 def verificar_nuevas_solicitudes():
-    usuario_id = session.get('usuario_id')
-    notificaciones = Notificacion.query.filter_by(usuario_id=usuario_id, leida=False).all()
-    cambios_externos = [n for n in notificaciones if n.tipo in ['contacto', 'actualizacion', 'proceso', 'cierre']]
-    return jsonify({
+  usuario_id = session.get('usuario_id')
+  notificaciones = Notificacion.query.filter_by(usuario_id=usuario_id, leida=False).all()
+  cambios_externos = [n for n in notificaciones if n.tipo in ['contacto', 'actualizacion', 'proceso', 'cierre']]
+  return jsonify({
         'cantidad': len(notificaciones),
         'tiene_cambio_externo': len(cambios_externos) > 0,
         'mensajes': [n.mensaje for n in notificaciones]
     })
-
 @app.route('/aceptar-solicitud/<int:sol_id>', methods=['POST'])
 def aceptar_solicitud(sol_id):
     if 'usuario_id' not in session:
@@ -828,7 +784,6 @@ def manifest():
         ]
     })
 
-# Service Worker actualizado para interceptar eventos push nativos
 @app.route('/sw.js')
 def service_worker():
     sw_code = """
@@ -839,7 +794,6 @@ def service_worker():
         e.waitUntil(clients.claim());
     });
     
-    // Escucha eventos push del sistema cuando la app está cerrada
     self.addEventListener('push', function(event) {
         let data = { title: "Cadena de Favores", body: "Tienes una nueva actualización." };
         if (event.data) {
@@ -872,11 +826,6 @@ def service_worker():
     """
     return sw_code, 200, {'Content-Type': 'application/javascript'}
 
-with app.app_context():
-    db.create_all()
-
-if __name__ == '_main_':
-    app.run(debug=True)
 @app.route('/api/ver-suscripciones')
 def ver_suscripciones():
     try:
@@ -884,3 +833,9 @@ def ver_suscripciones():
         return f"Total de celulares suscritos en la base de datos: {total}"
     except Exception as e:
         return f"Error al consultar la base de datos: {e}"
+
+with app.app_context():
+    db.create_all()
+
+if __name__ == '_main_':
+    app.run(debug=True)

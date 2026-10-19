@@ -620,7 +620,34 @@ def compromiso():
     if 'usuario_id' not in session:
         return redirect(url_for('inicio'))
     return render_template_string(COMPROMISO_TEMPLATE)
-                                  
+
+@app.route('/api/save-subscription', methods=['POST'])
+def save_subscription():
+    if 'usuario_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+    
+    sub_data = request.get_json()
+    if not sub_data or not sub_data.get('endpoint'):
+        return jsonify({'error': 'Datos de suscripción inválidos'}), 400
+        
+    usuario_id = session['usuario_id']
+    endpoint = sub_data.get('endpoint')
+    keys = sub_data.get('keys', {})
+    
+    # Comprobar si ya existe la suscripción para este endpoint
+    existente = PushSubscription.query.filter_by(endpoint=endpoint).first()
+    
+    if not existente:
+        nueva_sub = PushSubscription(
+            usuario_id=usuario_id,
+            endpoint=endpoint,
+            p256dh=keys.get('p256dh'),
+            auth=keys.get('auth')
+        )
+        db.session.add(nueva_sub)
+        db.session.commit()
+    
+    return jsonify({'success': True}), 200                                 
 @app.route('/muro')
 def muro():
     if 'usuario_id' not in session:

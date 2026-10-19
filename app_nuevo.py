@@ -147,7 +147,7 @@ BASE_TEMPLATE = """
     <meta name="theme-color" content="#4f46e5">
     <script>
       // Pega aquí tu llave pública (publicKey) generada en VapidKeys.com
-      const publicVapidKey = "BJvnANoeOraT2AfAKE4rO2pLHrabAwTeA7C5QhrOV1gH6Ghg1u8mo0MwJdS2lrQ73uq6eWAV1UEOJc1kktFNwcw";
+      const publicVapidKey = "BJvnANoeOraT2AfAKE4rO2pLHrabAwTeA7C5QhrOV1gH6Ghg1u8mo0MwJdS2lrQ73uq6eWAV1UEOJc1kktFNwcw",
 
       function urlBase64ToUint8Array(base64String) {
         const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -168,7 +168,7 @@ BASE_TEMPLATE = """
 
             // Pedir permiso y suscribir para notificaciones con la app cerrada
             const permission = await Notification.requestPermission();
-            if (permission === 'granted' && publicVapidKey !== "BJvnANoeOraT2AfAKE4rO2pLHrabAwTeA7C5QhrOV1gH6Ghg1u8mo0MwJdS2lrQ73uq6eWAV1UEOJc1kktFNwcw"; 
+            if (permission === 'granted' && publicVapidKey !== "BJvnANoeOraT2AfAKE4rO2pLHrabAwTeA7C5QhrOV1gH6Ghg1u8mo0MwJdS2lrQ73uq6eWAV1UEOJc1kktFNwcw", 
               const subscription = await reg.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: urlBase64ToUint8Array(publicVapidKey)

@@ -469,29 +469,56 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
     }
   });
   async function registrarNotificacionesPush() {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.log("Iniciando registro de push...");
+    
+    if (!('serviceWorker' in navigator)) {
+        alert("Tu navegador no soporta Service Workers");
+        return;
+    }
+    if (!('PushManager' in window)) {
+        alert("Tu navegador no soporta Push Notifications");
         return;
     }
 
     try {
+        // 1. Registrar Service Worker
         const reg = await navigator.serviceWorker.register('/sw.js');
+        console.log('SW registrado con éxito:', reg);
+
+        // 2. Solicitar permiso formalmente
         const permission = await Notification.requestPermission();
-        if (permission !== 'granted') return;
+        console.log('Estado del permiso:', permission);
+
+        if (permission !== 'granted') {
+            alert("El permiso de notificaciones fue denegado o bloqueado.");
+            return;
+        }
 
         const publicVapidKey = 'B3vnAlosOraT2AfAKE4r02pLHrabAwA7CSQhrOV1gHGhgIu0MoWJds21rQ73uq6eWAV1UEOJc1kktFNwcW';
 
+        // 3. Suscribir al dispositivo
         const subscription = await reg.pushManager.subscribe({
             userVisibleOnly: true,
             applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
         });
+        console.log('Suscripción generada con éxito');
 
-        await fetch('/api/save-subscription', {
+        // 4. Enviar al servidor Flask
+        const response = await fetch('/api/save-subscription', {
             method: 'POST',
             body: JSON.stringify(subscription),
             headers: { 'Content-Type': 'application/json' }
         });
+
+        if (response.ok) {
+            alert("¡Notificaciones activadas y guardadas con éxito!");
+        } else {
+            alert("Error al guardar la suscripción en el servidor.");
+        }
+
     } catch (error) {
-        console.error('Error push:', error);
+        console.error('Error detallado al registrar push:', error);
+        alert("Error: " + error.message);
     }
 }
 

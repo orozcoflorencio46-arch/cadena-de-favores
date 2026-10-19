@@ -45,7 +45,6 @@ app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///cadena_v3.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
-from sqlalchemy import text
 
 # -------------------------------------------------------------------
 # MODELOS DE BASE DE DATOS
@@ -64,7 +63,7 @@ class Publicacion(db.Model):
     titulo = db.Column(db.String(150), nullable=False)
     descripcion = db.Column(db.Text, nullable=False)
     materia_area = db.Column(db.String(100), nullable=False)
-    estado = db.Column(db.String(20), default ='activa') 
+    estado = db.Column(db.String(20), default='activa') 
     fecha_creacion = db.Column(db.DateTime, default=datetime.now)
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
     usuario = db.relationship('Usuario', backref='publicaciones')
@@ -99,11 +98,8 @@ def enviar_push_externa(usuario_id, titulo, mensaje):
     if not webpush:
         return
     suscripciones = PushSubscription.query.filter_by(usuario_id=usuario_id).all()
-    vapid_private_key = os.environ.get('VAPID_PRIVATE_KEY')
+    vapid_private_key = os.environ.get('VAPID_PRIVATE_KEY', 'eU08XGYBf4d0EVQZ25FZZtzMm5ratcWvu0Ye5ONB5hU')
     vapid_email = os.environ.get('VAPID_EMAIL', 'mailto:orozcoflorencio46@gmail.com')
-    
-    if not vapid_private_key:
-        return
 
     for sub in suscripciones:
         try:
@@ -143,96 +139,98 @@ BASE_TEMPLATE = """
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#4f46e5">
     <script>
-const publicVapidKey = "BJvnANoeOraT2AfAKE4rO2pLHrabAwTeA7C5QhrOV1gH6Ghg1u8mo0MwJdS2lrQ73uq6eWAV1UEOJc1kktFNwcw";
+    const publicVapidKey = "BJvnANoeOraT2AfAKE4rO2pLHrabAwTeA7C5QhrOV1gH6Ghg1u8mo0MwJdS2lrQ73uq6eWAV1UEOJc1kktFNwcw";
 
-function urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-    for (let i = 0; i < rawData.length; ++i) {
-        outputArray[i] = rawData.charCodeAt(i);
+    function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
     }
-    return outputArray;
-}
 
-document.addEventListener('DOMContentLoaded', () => {
-    const btnPush = document.getElementById('btn-activar-push');
-    if (btnPush) {
-        btnPush.addEventListener('click', async () => {
-            console.log("Iniciando suscripción a notificaciones...");
-            if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-                alert("Tu navegador no soporta notificaciones push.");
-                return;
-            }
+    // Funciones globales para el Modal de Instalación
+    window.abrirModalInstalacion = function() {
+        const modal = document.getElementById('modal-instalacion');
+        if (modal) modal.classList.remove('hidden');
+    };
 
-            try {
-                const reg = await navigator.serviceWorker.register('/sw.js');
-                const permission = await Notification.requestPermission();
-                
-                if (permission !== 'granted') {
-                    alert("El permiso de notificaciones fue denegado.");
+    window.cerrarModalInstalacion = function() {
+        const modal = document.getElementById('modal-instalacion');
+        if (modal) modal.classList.add('hidden');
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Asignación de evento para el botón de notificaciones push
+        const btnPush = document.getElementById('btn-activar-push');
+        if (btnPush) {
+            btnPush.addEventListener('click', async () => {
+                if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+                    alert("Tu navegador no soporta notificaciones push.");
                     return;
                 }
 
-                const subscription = await reg.pushManager.subscribe({
-                    userVisibleOnly: true,
-                    applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
-                });
+                try {
+                    const reg = await navigator.serviceWorker.register('/sw.js');
+                    const permission = await Notification.requestPermission();
+                    
+                    if (permission !== 'granted') {
+                        alert("El permiso de notificaciones fue denegado.");
+                        return;
+                    }
 
-                const response = await fetch('/api/save-subscription', {
-                    method: 'POST',
-                    body: JSON.stringify(subscription),
-                    headers: { 'Content-Type': 'application/json' }
-                });
+                    const subscription = await reg.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
+                    });
 
-                if (response.ok) {
-                    alert("¡Notificaciones activadas y guardadas correctamente!");
-                } else {
-                    alert("Error al guardar la suscripción en el servidor.");
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert("Error al activar: " + error.message);
-            }
-        });
-    }
+                    const response = await fetch('/api/save-subscription', {
+                        method: 'POST',
+                        body: JSON.stringify(subscription),
+                        headers: { 'Content-Type': 'application/json' }
+                    });
 
-    { if 'usuario_id' in session %}
-    setInterval(async () => {
-        try {
-            const res = await fetch('/api/verificar-nuevas-solicitudes');
-            const data = await res.json();
-            const badge = document.getElementById('badge-contador');
-            const audio = document.getElementById('tono-notificacion');
-            
-            if (data.cantidad > 0) {
-                if (badge) {
-                    badge.innerText = data.cantidad;
-                    badge.classList.remove('hidden');
+                    if (response.ok) {
+                        alert("¡Notificaciones activadas y guardadas correctamente!");
+                    } else {
+                        alert("Error al guardar la suscripción en el servidor.");
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert("Error al activar: " + error.message);
                 }
-                if (data.tiene_cambio_externo && audio) {
-                    audio.play().catch(e => console.log("Audio bloqueado por navegador hasta interacción previa"));
-                }
-            } else if (badge) {
-                badge.classList.add('hidden');
-            }
-        } catch (err) {
-            console.error("Error consultando notificaciones:", err);
+            });
         }
-    }, 10000);
-    { endif %}
-});
 
-function abrirModalInstalacion() {
-    const modal = document.getElementById('modal-instalacion');
-    if(modal) modal.classList.remove('hidden');
-}
-
-function cerrarModalInstalacion() {
-    const modal = document.getElementById('modal-instalacion');
-    if(modal) modal.classList.add('hidden');
-}
+        // Sondeo periódico para sonar y actualizar contador si la app está en primer plano
+        {% if 'usuario_id' in session %}
+        setInterval(async () => {
+            try {
+                const res = await fetch('/api/verificar-nuevas-solicitudes');
+                const data = await res.json();
+                const badge = document.getElementById('badge-contador');
+                const audio = document.getElementById('tono-notificacion');
+                
+                if (data.cantidad > 0) {
+                    if (badge) {
+                        badge.innerText = data.cantidad;
+                        badge.classList.remove('hidden');
+                    }
+                    if (data.tiene_cambio_externo && audio) {
+                        audio.play().catch(e => console.log("Reproducción automática bloqueada por el navegador."));
+                    }
+                } else if (badge) {
+                    badge.classList.add('hidden');
+                }
+            } catch (err) {
+                console.error("Error al consultar notificaciones:", err);
+            }
+        }, 8000);
+        {% endif %}
+    });
     </script>
 </head>
 <body class="bg-slate-900 min-h-screen text-gray-800 relative font-sans">
@@ -251,15 +249,15 @@ function cerrarModalInstalacion() {
                     + Publicar
                 </a>
                 
-                { if 'usuario_id' in session %}
+                {% if 'usuario_id' in session %}
                     <div class="flex items-center gap-2 pl-3 border-l border-white/20">
                         <span class="text-xs text-indigo-200">Hola, <strong>{{ session.get('usuario_nombre', 'Estudiante') }}</strong></span>
                         <a href="{{ url_for('logout') }}" class="bg-red-500/20 hover:bg-red-500/40 text-red-200 text-xs px-2.5 py-1 rounded-md border border-red-500/30 transition-all">
                             Cerrar Sesión
                         </a>
                     </div>
-                { endif %}
-            </div>
+            {% endif %}
+         </div>
         </div>
     </nav>
 
@@ -275,6 +273,7 @@ function cerrarModalInstalacion() {
         </div>
     </div>
 
+    <!-- Audio para alertas sonoras dentro de la app -->
     <audio id="tono-notificacion" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
     <main class="max-w-6xl mx-auto p-6 relative">
@@ -332,29 +331,19 @@ COMPROMISO_TEMPLATE = BASE_TEMPLATE + """
         <div class="text-4xl mb-3">🤝</div>
         <h2 class="text-2xl font-extrabold text-indigo-300 mb-4">Mi compromiso es conmigo.</h2>
         <div class="space-y-4 text-slate-300 text-sm sm:text-base leading-relaxed text-justify mb-6">
-        <p>
-        Al recibir apoyo, me comprometo conmigo mismo a seguir esta cadena y ayudar a alguien más cuando esté dentro de mis posibilidades.
-        </p>
-         <p>
-       Lo hago porque quiero ser consecuente con la solidaridad que hoy recibo. Puedo compartir lo que sé, dedicar un poco de mi tiempo u ofrecer una mano cuando alguien la necesite.
-         </p>
-        <p class="text-center font-bold text-amber-300 text-base sm:text-lg pt-2">
-           💛 Hoy recibo. Mañana puedo ser yo quien ayude.
-         </p>
+            <p>Al recibir apoyo, me comprometo conmigo mismo a seguir esta cadena y ayudar a alguien más cuando esté dentro de mis posibilidades.</p>
+            <p>Lo hago porque quiero ser consecuente con la solidaridad que hoy recibo. Puedo compartir lo que sé, dedicar un poco de mi tiempo u ofrecer una mano cuando alguien la necesite.</p>
+            <p class="text-center font-bold text-amber-300 text-base sm:text-lg pt-2">💛 Hoy recibo. Mañana puedo ser yo quien ayude.</p>
         </div>
             
         <div class="inline-flex items-center gap-3 bg-slate-900/60 px-4 py-3 rounded-xl border border-slate-700/80 mb-4">
-        <input type="checkbox" checked class="w-5 h-5 accent-indigo-500 rounded cursor-pointer pointer-events-none">
-        <span class="text-xs sm:text-sm text-slate-200 font-medium">
-          Asumo este compromiso personal de pagar el favor hacia adelante.
-          </span>
-         </div>
+            <input type="checkbox" checked class="w-5 h-5 accent-indigo-500 rounded cursor-pointer pointer-events-none">
+            <span class="text-xs sm:text-sm text-slate-200 font-medium">Asumo este compromiso personal de pagar el favor hacia adelante.</span>
+        </div>
             
-         <p class="text-xs text-indigo-400 font-semibold animate-pulse mt-2">
-          ✨ Haz clic en cualquier parte de la pantalla para avanzar al muro
-        </p>
-     </div>
- </div>
+        <p class="text-xs text-indigo-400 font-semibold animate-pulse mt-2">✨ Haz clic en cualquier parte de la pantalla para avanzar al muro</p>
+    </div>
+</div>
 """
 
 MURO_TEMPLATE = BASE_TEMPLATE + """
@@ -363,43 +352,45 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
         <h2 class="text-2xl font-bold text-gray-800">Muro de Necesidades y Apoyos</h2>
     </div>
     <div class="flex items-center gap-2">
+        <!-- Botón de Instalación PWA -->
         <button id="btn-instalar" onclick="abrirModalInstalacion()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-semibold shadow transition-all text-sm">
             📱 Instalar App
         </button>
 
-        <div id="modal-instalacion" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-            <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
-                <h3 class="text-xl font-bold text-gray-800 mb-4">📱 Instala nuestra Red de Apoyo</h3>
-                
-                <div class="space-y-4 text-sm text-gray-600">
-                    <div class="bg-indigo-50 p-3 rounded-lg">
-                        <p class="font-bold text-indigo-900 mb-1">🤖 Para Android (Google Chrome):</p>
-                        <ol class="list-decimal list-inside space-y-1 text-indigo-800">
-                            <li>Toca los tres puntos (<span class="font-bold">⋮</span>) arriba a la derecha.</li>
-                            <li>Selecciona <span class="font-bold">"Instalar aplicación"</span> o <span class="font-bold">"Añadir a pantalla principal"</span>.</li>
-                            <li>Confirma la instalación.</li>
-                        </ol>
-                    </div>
+        <a href="{{ url_for('nueva_publicacion') }}" class="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 font-semibold text-sm">+ Publicar</a>
+    </div>
+</div>
 
-                    <div class="bg-gray-50 p-3 rounded-lg">
-                        <p class="font-bold text-gray-900 mb-1">🍎 Para iPhone / iPad (Safari):</p>
-                        <ol class="list-decimal list-inside space-y-1 text-gray-700">
-                            <li>Toca el botón de <span class="font-bold">Compartir</span> (cuadrado con flecha <span class="font-bold">⬆️</span>) abajo en Safari.</li>
-                            <li>Desplázate y selecciona <span class="font-bold">"Añadir a pantalla de inicio"</span>.</li>
-                            <li>Pulsa en <span class="font-bold">"Añadir"</span> arriba a la derecha.</li>
-                        </ol>
-                    </div>
-                </div>
+<!-- Modal de Instalación -->
+<div id="modal-instalacion" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl relative">
+        <h3 class="text-xl font-bold text-gray-800 mb-4">📱 Instala nuestra Red de Apoyo</h3>
+        
+        <div class="space-y-4 text-sm text-gray-600">
+            <div class="bg-indigo-50 p-3 rounded-lg">
+                <p class="font-bold text-indigo-900 mb-1">🤖 Para Android (Google Chrome):</p>
+                <ol class="list-decimal list-inside space-y-1 text-indigo-800">
+                    <li>Toca los tres puntos (<span class="font-bold">⋮</span>) arriba a la derecha.</li>
+                    <li>Selecciona <span class="font-bold">"Instalar aplicación"</span> o <span class="font-bold">"Añadir a pantalla principal"</span>.</li>
+                    <li>Confirma la instalación.</li>
+                </ol>
+            </div>
 
-                <div class="mt-6 text-right">
-                    <button onclick="cerrarModalInstalacion()" class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">
-                        Entendido
-                    </button>
-                </div>
+            <div class="bg-gray-50 p-3 rounded-lg">
+                <p class="font-bold text-gray-900 mb-1">🍎 Para iPhone / iPad (Safari):</p>
+                <ol class="list-decimal list-inside space-y-1 text-gray-700">
+                    <li>Toca el botón de <span class="font-bold">Compartir</span> (cuadrado con flecha <span class="font-bold">⬆️</span>) abajo en Safari.</li>
+                    <li>Desplázate y selecciona <span class="font-bold">"Añadir a pantalla de inicio"</span>.</li>
+                    <li>Pulsa en <span class="font-bold">"Añadir"</span> arriba a la derecha.</li>
+                </ol>
             </div>
         </div>
 
-        <a href="{{ url_for('nueva_publicacion') }}" class="bg-green-600 text-white px-4 py-2 rounded shadow hover:bg-green-700 font-semibold text-sm">+ Publicar</a>
+        <div class="mt-6 text-right">
+            <button onclick="cerrarModalInstalacion()" class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">
+                Entendido
+            </button>
+        </div>
     </div>
 </div>
 
@@ -439,6 +430,7 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
     {% endfor %}
 </div>
 
+<!-- Botón Mis Solicitudes con Badge -->
 <div class="relative inline-block my-4">
     <a href="/mis-solicitudes" class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg shadow hover:bg-indigo-700 transition font-semibold text-sm">
         📬 Mis Solicitudes
@@ -645,6 +637,7 @@ def muro():
     if 'usuario_id' not in session:
         return redirect(url_for('registro'))
     
+    # Limpieza automática de publicaciones con más de 3 días sin ser completadas
     limite_tiempo = datetime.now() - timedelta(days=3)
     try:
         vencidas = Publicacion.query.filter(Publicacion.fecha_creacion < limite_tiempo, Publicacion.estado != 'completada').all()
@@ -701,14 +694,15 @@ def solicitar_contacto(id):
 @app.route('/api/verificar-nuevas-solicitudes', methods=['GET'])
 @login_required
 def verificar_nuevas_solicitudes():
-  usuario_id = session.get('usuario_id')
-  notificaciones = Notificacion.query.filter_by(usuario_id=usuario_id, leida=False).all()
-  cambios_externos = [n for n in notificaciones if n.tipo in ['contacto', 'actualizacion', 'proceso', 'cierre']]
-  return jsonify({
+    usuario_id = session.get('usuario_id')
+    notificaciones = Notificacion.query.filter_by(usuario_id=usuario_id, leida=False).all()
+    cambios_externos = [n for n in notificaciones if n.tipo in ['contacto', 'actualizacion', 'proceso', 'cierre']]
+    return jsonify({
         'cantidad': len(notificaciones),
         'tiene_cambio_externo': len(cambios_externos) > 0,
         'mensajes': [n.mensaje for n in notificaciones]
     })
+
 @app.route('/aceptar-solicitud/<int:sol_id>', methods=['POST'])
 def aceptar_solicitud(sol_id):
     if 'usuario_id' not in session:

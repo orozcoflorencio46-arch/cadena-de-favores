@@ -815,10 +815,10 @@ with app.app_context():
 
 if __name__ == '_main_':
     app.run(debug=True)
-    @app.route('/api/ver-suscripciones')
-    def ver_suscripciones():
-      try:
+@app.route('/api/ver-suscripciones')
+def ver_suscripciones():
+    try:
         total = PushSubscription.query.count()
         return f"Total de celulares suscritos en la base de datos: {total}"
-      except Exception as e:
+    except Exception as e:
         return f"Error al consultar la base de datos: {e}"

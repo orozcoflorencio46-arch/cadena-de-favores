@@ -466,6 +466,47 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
       btnInstalar.classList.add('hidden');
     }
   });
+  async function registrarNotificacionesPush() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        return;
+    }
+
+    try {
+        const reg = await navigator.serviceWorker.register('/sw.js');
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') return;
+
+        const publicVapidKey = 'B3vnAlosOraT2AfAKE4r02pLHrabAwA7CSQhrOV1gHGhgIu0MoWJds21rQ73uq6eWAV1UEOJc1kktFNwcW';
+
+        const subscription = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
+        });
+
+        await fetch('/api/save-subscription', {
+            method: 'POST',
+            body: JSON.stringify(subscription),
+            headers: { 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        console.error('Error push:', error);
+    }
+}
+
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+        outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+}
+
+window.addEventListener('load', () => {
+    registrarNotificacionesPush();
+});
 </script>
 """
 

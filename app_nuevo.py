@@ -146,47 +146,48 @@ BASE_TEMPLATE = """
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#4f46e5">
     <script>
-      // Pega aquí tu llave pública (publicKey) generada en VapidKeys.com
-      const publicVapidKey = "BJvnANoeOraT2AfAKE4rO2pLHrabAwTeA7C5QhrOV1gH6Ghg1u8mo0MwJdS2lrQ73uq6eWAV1UEOJc1kktFNwcw",
+     // Pega aquí tu llave pública (publicKey) generada en VapidKeys.com
+const publicVapidKey = "BJvnANoeOraT2AfAKE4rO2pLHrabAwTeA7C5QhrOV1gH6Ghg1u8mo0MwJdS2lrQ73uq6eWAV1UEOJc1kktFNwcw";
 
-      function urlBase64ToUint8Array(base64String) {
-        const padding = '='.repeat((4 - base64String.length % 4) % 4);
-        const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-        const rawData = window.atob(base64);
-        const outputArray = new Uint8Array(rawData.length);
-        for (let i = 0; i < rawData.length; ++i) {
-          outputArray[i] = rawData.charCodeAt(i);
-        }
-        return outputArray;
-      }
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
 
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', async function() {
-          try {
-            const reg = await navigator.serviceWorker.register('/sw.js');
-            console.log('Service Worker registrado con éxito');
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async function() {
+    try {
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      console.log('Service Worker registrado con éxito');
 
-            // Pedir permiso y suscribir para notificaciones con la app cerrada
-            const permission = await Notification.requestPermission();
-            if (permission === 'granted' && publicVapidKey !== "BJvnANoeOraT2AfAKE4rO2pLHrabAwTeA7C5QhrOV1gH6Ghg1u8mo0MwJdS2lrQ73uq6eWAV1UEOJc1kktFNwcw", 
-              const subscription = await reg.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
-              });
-
-              // Enviar la suscripción a Flask para guardarla en la base de datos
-              await fetch('/api/save-subscription', {
-                method: 'POST',
-                body: JSON.stringify(subscription),
-                headers: { 'content-type': 'application/json' }
-              });
-              console.log('Suscripción push guardada correctamente.');
-            }
-          } catch (err) {
-            console.log('Error en Service Worker o push:', err);
-          }
+      // Pedir permiso y suscribir para notificaciones con la app cerrada
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted' && publicVapidKey !== "BJvnANoeOraT2AfAKE4rO2pLHrabAwTeA7C5QhrOV1gH6Ghg1u8mo0MwJdS2lrQ73uq6eWAV1UEOJc1kktFNwcw") {
+        
+        const subscription = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
         });
+
+        // Enviar la suscripción a Flask para guardarla en la base de datos
+        await fetch('/api/save-subscription', {
+          method: 'POST',
+          body: JSON.stringify(subscription),
+          headers: { 'content-type': 'application/json' }
+        });
+        console.log('Suscripción push guardada correctamente.');
       }
+    } catch (err) {
+      console.log('Error en Service Worker o push:', err);
+    }
+  });
+}
     </script>
 </head>
 <body class="bg-slate-900 min-h-screen text-gray-800 relative font-sans">

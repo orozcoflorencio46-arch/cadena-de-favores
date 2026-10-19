@@ -73,10 +73,12 @@ class SolicitudContacto(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     publicacion_id = db.Column(db.Integer, db.ForeignKey('publicacion.id'), nullable=False)
     solicitante_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=False)
-    estado = db.Column(db.String(20), default='pendiente')
+    estado = db.Column(db.String(20), default='pendiente')  # 'pendiente', 'en contacto', 'finalizado'
 
     publicacion = db.relationship('Publicacion', backref='solicitudes')
     solicitante = db.relationship('Usuario', backref='solicitudes_hechas')
+    with app.app_context():
+        db.create_all()
 
 class Notificacion(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -541,19 +543,20 @@ SOLICITUDES_TEMPLATE = BASE_TEMPLATE + """
           <div>
              {% if sol.estado == 'pendiente' %}
               <!-- El dueño AUTORIZA enviar sus datos de contacto -->
-              <form action="/aceptar-solicitud/{{ sol.publicacion.usuario.nombre }}" method="POST">
+              <form action="/aceptar-solicitud/{{ sol.id }}" method="POST">
                 <button type="submit" class="text-xs bg-green-600 text-white px-3 py-1.5 rounded font-bold hover:bg-green-700">
                   Autorizar y Compartir Datos
                 </button>
               </form>
-{% elif sol.estado == 'aceptado' %}
-<!-- En este punto el dueño ya aceptó y se comparten los datos de ambos de inmediato -->
-<div class="mt-2 p-3 bg-green-50 border border-green-200 rounded text-xs">
-    <p class="font-bold text-green-800">✅ ¡Datos de Contacto Autorizados!</p>
-    <p class="mt-1"><strong>Dueño de la publicación:</strong> {{ sol.publicacion.usuario.nombre | default('Usuario', true) }} - 📞 Teléfono: {{ sol.publicacion.usuario.contacto | default('No registrado', true) }}</p>
-    <p class="mt-1"><strong>Persona interesada (Solicitante):</strong> {{ sol.solicitante.nombre | default('Usuario', true) }} - 📞 Teléfono: {{ sol.solicitante.contacto | default('No registrado', true) }}</p>
-    <p class="text-gray-600 mt-1 italic">Ambos ya pueden comunicarse para coordinar el apoyo.</p>
-</div>
+
+              {% elif sol.estado == 'aceptado' %}
+    <!-- En este punto el dueño ya aceptó y se comparten los datos de ambos de inmediato -->
+    <div class="mt-2 p-3 bg-green-50 border border-green-200 rounded text-xs">
+        <p class="font-bold text-green-800">✅ ¡Datos de Contacto Compartidos!</p>
+        <p class="mt-1"><strong>Dueño de la publicación:</strong> {{ sol.publicacion.usuario.nombre }} — 📞 Teléfono: {{ sol.publicacion.usuario.contacto }}</p>
+        <p><strong>Persona interesada (Solicitante):</strong> {{ sol.solicitante.nombre }} — 📞 Teléfono: {{ sol.solicitante.contacto }}</p>
+        <p class="text-gray-600 mt-1 italic">Ambos ya pueden comunicarse para coordinar el apoyo.</p>
+    </div>
               
             {% elif sol.estado == 'brindado' %}
               <form action="/validar-apoyo/{{ sol.id }}" method="POST">

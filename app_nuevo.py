@@ -404,7 +404,9 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
         0
     </span>
 </div>
-
+<button id="btn-activar-push" onclick="registrarNotificacionesPush()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow font-medium my-2">
+    🔔 Activar Notificaciones Push
+</button>
 <!-- Elemento de audio para las alertas -->
 <audio id="tono-notificacion" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
@@ -503,9 +505,6 @@ function urlBase64ToUint8Array(base64String) {
     }
     return outputArray;
 }
-
-window.addEventListener('load', () => {
-    registrarNotificacionesPush();
 });
 </script>
 """

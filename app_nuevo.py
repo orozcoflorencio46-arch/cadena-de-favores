@@ -404,123 +404,71 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
         0
     </span>
 </div>
-<button id="btn-activar-push" onclick="registrarNotificacionesPush()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow font-medium my-2">
-    🔔 Activar Notificaciones Push
-</button>
+
 <!-- Elemento de audio para las alertas -->
 <audio id="tono-notificacion" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" preload="auto"></audio>
 
+<!-- Botón en tu HTML (sin onclick inline) -->
+<button id="btn-activar-push" class="px-4 py-2 bg-indigo-600 text-white rounded-lg shadow font-medium my-2">
+    🔔 Activar Notificaciones Push
+</button>
+
 <script>
-  let cantidadAnterior = 0;
-  let primerCarga = true;
+document.addEventListener('DOMContentLoaded', () => {
+    const btnPush = document.getElementById('btn-activar-push');
+    if (btnPush) {
+        btnPush.addEventListener('click', async () => {
+            console.log("Botón presionado, iniciando registro...");
 
-  function actualizarContadorNotificaciones() {
-    fetch('/api/verificar-nuevas-solicitudes')
-      .then(response => response.json())
-      .then(data => {
-        const badge = document.getElementById('badge-contador');
-        const tono = document.getElementById('tono-notificacion');
-        const cantidadNueva = data.cantidad || 0;
+            if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+                alert("Tu navegador no soporta notificaciones push.");
+                return;
+            }
 
-        if (badge) {
-          if (cantidadNueva > 0) {
-            badge.textContent = cantidadNueva;
-            badge.classList.remove('hidden');
-          } else {
-            badge.classList.add('hidden');
-          }
-        }
+            try {
+                // 1. Registrar el Service Worker
+                const reg = await navigator.serviceWorker.register('/sw.js');
+                console.log('Service Worker registrado:', reg);
 
-        // Reproducir tono de aviso únicamente si la otra persona realizó una acción o cambio
-        if (cantidadNueva > cantidadAnterior && !primerCarga && data.tiene_cambio_externo) {
-          if (tono) {
-            tono.play().catch(error => {
-              console.log('Audio bloqueado por políticas del navegador:', error);
-            });
-          }
-        }
+                // 2. Pedir permiso formalmente
+                const permission = await Notification.requestPermission();
+                console.log('Permiso obtenido:', permission);
 
-        cantidadAnterior = cantidadNueva;
-        primerCarga = false;
-      })
-      .catch(err => console.error("Error consultando notificaciones:", err));
-  }
+                if (permission !== 'granted') {
+                    alert("El permiso de notificaciones fue denegado.");
+                    return;
+                }
 
-  function abrirModalInstalacion() {
-    const modal = document.getElementById('modal-instalacion');
-    if (modal) modal.classList.remove('hidden');
-  }
+                // Tu llave pública VAPID
+                const publicVapidKey = 'B3vnAlosOraT2AfAKE4r02pLHrabAwA7CSQhrOV1gHGhgIu0MoWJds21rQ73uq6eWAV1UEOJc1kktFNwcW';
 
-  function cerrarModalInstalacion() {
-    const modal = document.getElementById('modal-instalacion');
-    if (modal) modal.classList.add('hidden');
-  }
+                // 3. Suscribir el dispositivo
+                const subscription = await reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
+                });
+                console.log('Suscripción push creada con éxito.');
 
-  document.addEventListener('DOMContentLoaded', () => {
-    actualizarContadorNotificaciones();
-    setInterval(actualizarContadorNotificaciones, 8000);
+                // 4. Enviar los datos al servidor Flask
+                const response = await fetch('/api/save-subscription', {
+                    method: 'POST',
+                    body: JSON.stringify(subscription),
+                    headers: { 'Content-Type': 'application/json' }
+                });
 
-    const btnInstalar = document.getElementById('btn-instalar');
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+                if (response.ok) {
+                    alert("¡Notificaciones activadas y guardadas correctamente!");
+                } else {
+                    alert("Hubo un error al guardar la suscripción en el servidor.");
+                }
 
-    if (isStandalone && btnInstalar) {
-      btnInstalar.style.display = 'none';
-      btnInstalar.classList.add('hidden');
-    }
-  });
-  async function registrarNotificacionesPush() {
-    console.log("Iniciando registro de push...");
-    
-    if (!('serviceWorker' in navigator)) {
-        alert("Tu navegador no soporta Service Workers");
-        return;
-    }
-    if (!('PushManager' in window)) {
-        alert("Tu navegador no soporta Push Notifications");
-        return;
-    }
-
-    try {
-        // 1. Registrar Service Worker
-        const reg = await navigator.serviceWorker.register('/sw.js');
-        console.log('SW registrado con éxito:', reg);
-
-        // 2. Solicitar permiso formalmente
-        const permission = await Notification.requestPermission();
-        console.log('Estado del permiso:', permission);
-
-        if (permission !== 'granted') {
-            alert("El permiso de notificaciones fue denegado o bloqueado.");
-            return;
-        }
-
-        const publicVapidKey = 'B3vnAlosOraT2AfAKE4r02pLHrabAwA7CSQhrOV1gHGhgIu0MoWJds21rQ73uq6eWAV1UEOJc1kktFNwcW';
-
-        // 3. Suscribir al dispositivo
-        const subscription = await reg.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
+            } catch (error) {
+                console.error('Error detallado:', error);
+                alert("Error al activar: " + error.message);
+            }
         });
-        console.log('Suscripción generada con éxito');
-
-        // 4. Enviar al servidor Flask
-        const response = await fetch('/api/save-subscription', {
-            method: 'POST',
-            body: JSON.stringify(subscription),
-            headers: { 'Content-Type': 'application/json' }
-        });
-
-        if (response.ok) {
-            alert("¡Notificaciones activadas y guardadas con éxito!");
-        } else {
-            alert("Error al guardar la suscripción en el servidor.");
-        }
-
-    } catch (error) {
-        console.error('Error detallado al registrar push:', error);
-        alert("Error: " + error.message);
     }
-}
+});
 
 function urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -532,7 +480,6 @@ function urlBase64ToUint8Array(base64String) {
     }
     return outputArray;
 }
-});
 </script>
 """
 

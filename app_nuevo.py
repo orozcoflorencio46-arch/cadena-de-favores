@@ -308,7 +308,7 @@ REGISTRO_TEMPLATE = BASE_TEMPLATE + """
         </div>
         <div>
             <label class="block text-xs font-semibold uppercase tracking-wider text-gray-600 mb-1">Contacto / Teléfono</label>
-            <input type="text" name="contacto" required placeholder="+502 5555-5555" 
+            <input type="text" name="contacto" required placeholder="5555-5555" 
                 class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
         </div>
         <div class="mb-4">

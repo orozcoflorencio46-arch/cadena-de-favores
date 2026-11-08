@@ -638,22 +638,21 @@ def muro():
     return redirect(url_for('registro'))
 
   try:
-    # Condición de tiempo: borra publicaciones con más de 3 días sin completar
-    limite_tiempo = datetime.now() - timedelta(days=3)
+    # 1. Borrar de forma inmediata cualquier publicación que no tenga fecha (las huérfanas viejas)
+    Publicacion.query.filter(Publicacion.fecha_creacion.is_(None)).delete()
 
+    # 2. Borrar las que superen los 3 días de antigüedad
+    limite_tiempo = datetime.now() - timedelta(days=3)
     Publicacion.query.filter(
         Publicacion.fecha_creacion < limite_tiempo,
         Publicacion.estado != 'completado',
     ).delete()
 
-    # Borra las que se quedaron sin fecha registrada
-    Publicacion.query.filter(Publicacion.fecha_creacion.is_(None)).delete()
-
     db.session.commit()
-  except Exception:
+  except Exception as e:
     db.session.rollback()
 
-  # Carga únicamente las publicaciones activas y vigentes
+  # 3. Cargar las publicaciones vigentes ordenadas de más nueva a más vieja
   publicaciones = Publicacion.query.filter(
       Publicacion.estado != 'completado'
   ).order_by(

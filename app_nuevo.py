@@ -639,51 +639,43 @@ def muro():
     return redirect(url_for('registro'))
 
   try:
-    limite_tiempo = datetime.now() - timedelta(days=3)
-
-    # 1. Identificar IDs de publicaciones a eliminar (nulas y vencidas)
-    ids_nulas = db.session.query(Publicacion.id).filter(
-        Publicacion.fecha_creacion.is_(None)
-    ).subquery()
-    
-    ids_vencidas = db.session.query(Publicacion.id).filter(
-        Publicacion.fecha_creacion < limite_tiempo,
-        Publicacion.estado != 'completado'
-    ).subquery()
-
-    # 2. Borrar primero las solicitudes de contacto asociadas para evitar el conflicto de llave foránea
-    SolicitudContacto.query.filter(SolicitudContacto.publicacion_id.in_(ids_nulas)).delete(synchronize_session=False)
-    SolicitudContacto.query.filter(SolicitudContacto.publicacion_id.in_(ids_vencidas)).delete(synchronize_session=False)
-
-    # 3. Ahora sí, borrar las publicaciones nulas y vencidas de forma segura
-    borradas_nulas = Publicacion.query.filter(
-        Publicacion.fecha_creacion.is_(None)
+    # 1. Borrar de forma directa las publicaciones que ya estén completadas
+    borradas_completadas = Publicacion.query.filter(
+        db.func.lower(db.func.trim(Publicacion.estado)) == 'completado'
     ).delete(synchronize_session=False)
 
+    # 2. Definir el límite de tiempo de 3 días para las vigentes no completadas
+    limite_tiempo = datetime.now() - timedelta(days=3)
+    
+    # Obtener IDs de publicaciones vencidas o sin fecha
+    ids_vencidas = db.session.query(Publicacion.id).filter(
+        db.or_(
+            Publicacion.fecha_creacion < limite_tiempo,
+            Publicacion.fecha_creacion.is_(None)
+        ),
+        db.func.lower(db.func.trim(Publicacion.estado)) != 'completado'
+    ).subquery()
+
+    # Borrar primero las solicitudes de contacto asociadas a esas publicaciones vencidas
+    SolicitudContacto.query.filter(SolicitudContacto.publicacion_id.in_(ids_vencidas)).delete(synchronize_session=False)
+    
+    # Borrar las publicaciones vencidas o sin fecha
     borradas_vencidas = Publicacion.query.filter(
-        Publicacion.fecha_creacion < limite_tiempo,
-        Publicacion.estado != 'completado',
+        db.or_(
+            Publicacion.fecha_creacion < limite_tiempo,
+            Publicacion.fecha_creacion.is_(None)
+        ),
+        db.func.lower(db.func.trim(Publicacion.estado)) != 'completado'
     ).delete(synchronize_session=False)
 
     db.session.commit()
-    print(f"ÉXITO: Se eliminaron {borradas_nulas} nulas y {borradas_vencidas} vencidas con sus solicitudes.")
+    
+    if borradas_completadas > 0 or borradas_vencidas > 0:
+      print(f"LIMPIEZA EXITOSA: Se borraron {borradas_completadas} completadas y {borradas_vencidas} vencidas.")
 
   except Exception as e:
     db.session.rollback()
     print("ERROR EN LIMPIEZA:", e)
-
-  # 4. Cargar las publicaciones vigentes ordenadas
-  publicaciones = Publicacion.query.filter(
-      Publicacion.estado != 'completado'
-  ).order_by(
-      Publicacion.fecha_creacion.desc().nullslast()
-  ).all()
-
-  return render_template_string(
-      MURO_TEMPLATE,
-      publicaciones=publicaciones,
-      usuario_id_session=session['usuario_id'],
-  )
     
 @app.route('/nueva-publicacion', methods=['GET', 'POST'])
 def nueva_publicacion():

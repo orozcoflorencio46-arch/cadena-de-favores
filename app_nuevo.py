@@ -632,37 +632,47 @@ def save_subscription():
     
     return jsonify({'success': True}), 200                                 
 
+
 @app.route('/muro')
 def muro():
   if 'usuario_id' not in session:
     return redirect(url_for('registro'))
 
   try:
-    # 1. Borrar publicaciones con fecha nula (huérfanas)
+    limite_tiempo = datetime.now() - timedelta(days=3)
+
+    # 1. Identificar IDs de publicaciones a eliminar (nulas y vencidas)
+    ids_nulas = db.session.query(Publicacion.id).filter(
+        Publicacion.fecha_creacion.is_(None)
+    ).subquery()
+    
+    ids_vencidas = db.session.query(Publicacion.id).filter(
+        Publicacion.fecha_creacion < limite_tiempo,
+        Publicacion.estado != 'completado'
+    ).subquery()
+
+    # 2. Borrar primero las solicitudes de contacto asociadas para evitar el conflicto de llave foránea
+    SolicitudContacto.query.filter(SolicitudContacto.publicacion_id.in_(ids_nulas)).delete(synchronize_session=False)
+    SolicitudContacto.query.filter(SolicitudContacto.publicacion_id.in_(ids_vencidas)).delete(synchronize_session=False)
+
+    # 3. Ahora sí, borrar las publicaciones nulas y vencidas de forma segura
     borradas_nulas = Publicacion.query.filter(
         Publicacion.fecha_creacion.is_(None)
-    ).delete()
+    ).delete(synchronize_session=False)
 
-    # 2. Borrar publicaciones con más de 3 días de antigüedad y no completadas
-    limite_tiempo = datetime.now() - timedelta(days=3)
     borradas_vencidas = Publicacion.query.filter(
         Publicacion.fecha_creacion < limite_tiempo,
         Publicacion.estado != 'completado',
-    ).delete()
+    ).delete(synchronize_session=False)
 
     db.session.commit()
-
-    if borradas_nulas > 0 or borradas_vencidas > 0:
-      print(
-          f'LOG DE LIMPIEZA: Se borraron {borradas_nulas} nulas y'
-          f' {borradas_vencidas} vencidas.'
-      )
+    print(f"ÉXITO: Se eliminaron {borradas_nulas} nulas y {borradas_vencidas} vencidas con sus solicitudes.")
 
   except Exception as e:
     db.session.rollback()
-    print('ERROR EN LIMPIEZA:', e)
+    print("ERROR EN LIMPIEZA:", e)
 
-  # 3. Cargar las publicaciones vigentes
+  # 4. Cargar las publicaciones vigentes ordenadas
   publicaciones = Publicacion.query.filter(
       Publicacion.estado != 'completado'
   ).order_by(

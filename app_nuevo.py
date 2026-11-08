@@ -349,11 +349,11 @@ COMPROMISO_TEMPLATE = BASE_TEMPLATE + """
 MURO_TEMPLATE = BASE_TEMPLATE + """
 <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6 bg-white p-4 rounded-xl shadow-md">
     <div>
-    <div class="tarjeta-contador" style="background: #1e293b; color: #ffffff; padding: 8px 14px; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500;">
+   <div class="tarjeta-contador" style="background: #1e293b; color: #ffffff; padding: 8px 14px; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500;">
     <span>👥 Estudiantes registrados:</span>
-    <strong style="color: #38bdf8; font-size: 16px; font-weight: bold;">
-        {{ total_estudiantes if total_estudiantes is not none else 0 }}
-    </strong>
+    <span style="color: #38bdf8; font-weight: bold; font-size: 16px;">
+        {% if total_estudiantes is defined %}{{ total_estudiantes }}{% else %}0{% endif %}
+    </span>
 </div>
         <h2 class="text-2xl font-bold text-gray-800">Muro de Necesidades y Apoyos</h2>
     </div>
@@ -644,6 +644,7 @@ def save_subscription():
 def muro():
     if 'usuario_id' not in session:
         return redirect(url_for('registro'))
+    
     total_estudiantes = Usuario.query.count()
     # Limpieza automática de publicaciones con más de 3 días sin ser completadas
     limite_tiempo = datetime.now() - timedelta(days=3)  # 3 días en minutos

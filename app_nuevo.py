@@ -644,6 +644,14 @@ def save_subscription():
 def muro():
     if 'usuario_id' not in session:
         return redirect(url_for('registro'))
+    # Contar estudiantes y depurar en consola
+try:
+    total_estudiantes = Usuario.query.count()
+    todos_los_usuarios = Usuario.query.all()
+    print(f"DEBUG USUARIOS: Total={total_estudiantes}, Lista={[u.id for u in todos_los_usuarios]}")
+except Exception as e:
+    print("ERROR AL CONTAR USUARIOS:", e)
+    total_estudiantes = 0
     
     total_estudiantes = Usuario.query.count()
     # Limpieza automática de publicaciones con más de 3 días sin ser completadas

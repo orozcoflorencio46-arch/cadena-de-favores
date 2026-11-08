@@ -634,24 +634,28 @@ def save_subscription():
 
 @app.route('/muro')
 def muro():
-    if 'usuario_id' not in session:
-        return redirect(url_for('registro'))
-    
-    # Limpieza automática de publicaciones con más de 3 días sin ser completadas
-    limite_tiempo = datetime.now() - timedelta(days=3)  # 3 días en minutos
-    try:
-        vencidas = Publicacion.query.filter(
-         Publicacion.fecha_creacion < limite_tiempo,
-         Publicacion.estado != 'completada',
-            ).delete()
-        Publicacion.query.filter(Publicacion.fecha_creacion.is_(None)).delete()
-        
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
+  if 'usuario_id' not in session:
+    return redirect(url_for('registro'))
 
-    publicaciones = Publicacion.query.filter(Publicacion.estado != 'completada').order_by(Publicacion.fecha_creacion.desc()).all()
-    return render_template_string(MURO_TEMPLATE, publicaciones=publicaciones, usuario_id=session['usuario_id'])
+  try:
+    # BORRADO TOTAL TEMPORAL: Elimina todas las publicaciones anteriores para limpiar la base de datos
+    Publicacion.query.delete()
+    db.session.commit()
+  except Exception as e:
+    db.session.rollback()
+
+  # Cargar el muro (que estará limpio)
+  publicaciones = Publicacion.query.filter(
+      Publicacion.estado != 'completado'
+  ).order_by(
+      Publicacion.fecha_creacion.desc().nullslast()
+  ).all()
+
+  return render_template_string(
+      MURO_TEMPLATE,
+      publicaciones=publicaciones,
+      usuario_id_session=session['usuario_id'],
+  )
     
 @app.route('/nueva-publicacion', methods=['GET', 'POST'])
 def nueva_publicacion():
@@ -671,16 +675,6 @@ def nueva_publicacion():
         return redirect(url_for('muro'))
     return render_template_string(NUEVA_PUB_TEMPLATE)
 
-@app.route('/borrar-todo-forzar')
-def borrar_todo_forzar():
-  try:
-    # Borra absolutamente todas las publicaciones no completadas o de prueba
-    Publicacion.query.delete()
-    db.session.commit()
-    return '¡Todas las publicaciones han sido borradas de la base de datos!'
-  except Exception as e:
-    db.session.rollback()
-    return f'Error al borrar: {e}'
 
 @app.route('/solicitar_contacto/<int:id>', methods=['POST'])
 @login_required

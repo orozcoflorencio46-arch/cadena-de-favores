@@ -349,8 +349,11 @@ COMPROMISO_TEMPLATE = BASE_TEMPLATE + """
 MURO_TEMPLATE = BASE_TEMPLATE + """
 <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6 bg-white p-4 rounded-xl shadow-md">
     <div>
-    <div style="display: inline-flex; align-items: center; gap: 8px;">
-    👥 Estudiantes registrados: <strong>{{ total_estudiantes }}</strong>
+    <div class="tarjeta-contador" style="background: #1e293b; color: #ffffff; padding: 8px 14px; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500;">
+    <span>👥 Estudiantes registrados:</span>
+    <strong style="color: #38bdf8; font-size: 16px; font-weight: bold;">
+        {{ total_estudiantes if total_estudiantes is not none else 0 }}
+    </strong>
 </div>
         <h2 class="text-2xl font-bold text-gray-800">Muro de Necesidades y Apoyos</h2>
     </div>

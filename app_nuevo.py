@@ -635,47 +635,24 @@ def save_subscription():
 
 @app.route('/muro')
 def muro():
-  if 'usuario_id' not in session:
-    return redirect(url_for('registro'))
-
-  try:
-    # 1. Borrar de forma directa las publicaciones que ya estén completadas
-    borradas_completadas = Publicacion.query.filter(
-        db.func.lower(db.func.trim(Publicacion.estado)) == 'completado'
-    ).delete(synchronize_session=False)
-
-    # 2. Definir el límite de tiempo de 3 días para las vigentes no completadas
-    limite_tiempo = datetime.now() - timedelta(days=3)
+    if 'usuario_id' not in session:
+        return redirect(url_for('registro'))
     
-    # Obtener IDs de publicaciones vencidas o sin fecha
-    ids_vencidas = db.session.query(Publicacion.id).filter(
-        db.or_(
-            Publicacion.fecha_creacion < limite_tiempo,
-            Publicacion.fecha_creacion.is_(None)
-        ),
-        db.func.lower(db.func.trim(Publicacion.estado)) != 'completado'
-    ).subquery()
+    # Limpieza automática de publicaciones con más de 3 días sin ser completadas
+    limite_tiempo = datetime.now() - timedelta(days=3)  # 3 días en minutos
+    try:
+        vencidas = Publicacion.query.filter(
+         Publicacion.fecha_creacion < limite_tiempo,
+         Publicacion.estado != 'completada',
+            ).delete()
+        Publicacion.query.filter(Publicacion.fecha_creacion.is_(None)).delete()
+        
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
-    # Borrar primero las solicitudes de contacto asociadas a esas publicaciones vencidas
-    SolicitudContacto.query.filter(SolicitudContacto.publicacion_id.in_(ids_vencidas)).delete(synchronize_session=False)
-    
-    # Borrar las publicaciones vencidas o sin fecha
-    borradas_vencidas = Publicacion.query.filter(
-        db.or_(
-            Publicacion.fecha_creacion < limite_tiempo,
-            Publicacion.fecha_creacion.is_(None)
-        ),
-        db.func.lower(db.func.trim(Publicacion.estado)) != 'completado'
-    ).delete(synchronize_session=False)
-
-    db.session.commit()
-    
-    if borradas_completadas > 0 or borradas_vencidas > 0:
-      print(f"LIMPIEZA EXITOSA: Se borraron {borradas_completadas} completadas y {borradas_vencidas} vencidas.")
-
-  except Exception as e:
-    db.session.rollback()
-    print("ERROR EN LIMPIEZA:", e)
+    publicaciones = Publicacion.query.filter(Publicacion.estado != 'completada').order_by(Publicacion.fecha_creacion.desc()).all()
+    return render_template_string(MURO_TEMPLATE, publicaciones=publicaciones, usuario_id=session['usuario_id'])
     
 @app.route('/nueva-publicacion', methods=['GET', 'POST'])
 def nueva_publicacion():

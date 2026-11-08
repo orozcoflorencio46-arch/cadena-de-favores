@@ -640,7 +640,7 @@ def muro():
     # Limpieza automática de publicaciones con más de 3 días sin ser completadas
     limite_tiempo = datetime.now() - timedelta(days=3)
     try:
-        vencidas = Publicacion.query.filter(Publicacion.fecha_creacion < limite_tiempo, Publicacion.estado != 'completada').all()
+        vencidas = Publicacion.query.filter(Publicacion.fecha_creacion < limite_tiempo, Publicacion.fecha_creacion.is_(None), Publicacion.estado != 'completada').all()
         for pub in vencidas:
             db.session.delete(pub)
         db.session.commit()
@@ -660,7 +660,8 @@ def nueva_publicacion():
             materia_area=request.form['materia_area'],
             titulo=request.form['titulo'],
             descripcion=request.form['descripcion'],
-            usuario_id=session['usuario_id']
+            usuario_id=session['usuario_id'],
+            fecha_creacion=datetime.now()
         )
         db.session.add(pub)
         db.session.commit()

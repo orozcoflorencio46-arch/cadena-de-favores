@@ -638,7 +638,7 @@ def muro():
         return redirect(url_for('registro'))
     
     # Limpieza automática de publicaciones con más de 3 días sin ser completadas
-    limite_tiempo = datetime.now() - timedelta(minutes=1)  # 3 días en minutos
+    limite_tiempo = datetime.now() - timedelta(days=3)  # 3 días en minutos
     try:
         vencidas = Publicacion.query.filter(
          Publicacion.fecha_creacion < limite_tiempo,
@@ -670,6 +670,17 @@ def nueva_publicacion():
         db.session.commit()
         return redirect(url_for('muro'))
     return render_template_string(NUEVA_PUB_TEMPLATE)
+
+@app.route('/borrar-todo-forzar')
+def borrar_todo_forzar():
+  try:
+    # Borra absolutamente todas las publicaciones no completadas o de prueba
+    Publicacion.query.delete()
+    db.session.commit()
+    return '¡Todas las publicaciones han sido borradas de la base de datos!'
+  except Exception as e:
+    db.session.rollback()
+    return f'Error al borrar: {e}'
 
 @app.route('/solicitar_contacto/<int:id>', methods=['POST'])
 @login_required

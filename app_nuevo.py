@@ -703,29 +703,66 @@ def nueva_publicacion():
         return redirect(url_for('muro'))
     return render_template_string(NUEVA_PUB_TEMPLATE)
 
-
+# --- 1. RUTA PARA SOLICITAR CONTACTO ---
 @app.route('/solicitar_contacto/<int:id>', methods=['POST'])
 @login_required
 def solicitar_contacto(id):
     publicacion = Publicacion.query.get_or_404(id)
     usuario_actual_id = session.get('usuario_id')
     
+    # Evitar que el usuario se solicite a sí mismo
     if publicacion.usuario_id == usuario_actual_id:
         flash("No puedes solicitar contacto a tu propia publicación.", "warning")
         return redirect(url_for('muro'))
 
-    existente = SolicitudContacto.query.filter_by(publicacion_id=id, solicitante_id=usuario_actual_id).first()
+    # 1. CREAR EL REGISTRO DE LA SOLICITUD (¡Esto faltaba para que aparezca en Mis Solicitudes!)
+    existente = SolicitudContacto.query.filter_by(
+        publicacion_id=id, 
+        solicitante_id=usuario_actual_id
+    ).first()
+
     if not existente:
-        nueva_solicitud = SolicitudContacto(publicacion_id=id, solicitante_id=usuario_actual_id, estado='pendiente')
+        nueva_solicitud = SolicitudContacto(
+            publicacion_id=id,
+            solicitante_id=usuario_actual_id,
+            estado='pendiente'
+        )
         db.session.add(nueva_solicitud)
         publicacion.estado = 'en_proceso'
 
+        # Obtener el nombre del usuario actual para la notificación
         usuario_actual = Usuario.query.get(usuario_actual_id)
         nombre_usuario = usuario_actual.nombre if usuario_actual else "Un estudiante"
 
-        registrar_notificacion(publicacion.usuario_id, f"¡{nombre_usuario} quiere contactarte para: '{publicacion.titulo}'!", tipo='contacto')
+        # 2. Notificación para el CREADOR de la publicación
+        mensaje_creador = f"¡El estudiante {nombre_usuario} quiere contactarte para apoyarte con: '{publicacion.titulo}'!"
+        registrar_notificacion(publicacion.usuario_id, mensaje_creador, tipo='contacto')
+
+        # 3. Notificación para el SOLICITANTE (confirmación)
+        mensaje_solicitante = f"Has solicitado contacto para la publicación: '{publicacion.titulo}'."
+        registrar_notificacion(usuario_actual_id, mensaje_solicitante, tipo='info')
+
         db.session.commit()
-        flash("¡Solicitud enviada con éxito!", "success")
+        flash("¡Solicitud de contacto enviada con éxito!", "success")
+    else:
+        flash("Ya habías enviado una solicitud para esta publicación.", "info")
+
+    return redirect(url_for('muro'))
+
+
+@app.route('/cerrar_favor/<int:id>', methods=['POST'])
+@login_required
+def cerrar_favor(id):
+    publicacion = Publicacion.query.get_or_404(id)
+    publicacion.estado = 'completada'
+    
+    mensaje = f"El favor '{publicacion.titulo}' ha sido marcado como completado. ¡Gracias por colaborar!"
+    
+    # Notificar al creador de la publicación
+    registrar_notificacion(publicacion.usuario_id, mensaje, tipo='cierre')
+    
+    db.session.commit()
+    flash("Favor marcado como completado.", "info")
     return redirect(url_for('muro'))
 
 @app.route('/api/verificar-nuevas-solicitudes', methods=['GET'])

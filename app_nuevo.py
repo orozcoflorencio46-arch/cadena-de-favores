@@ -352,6 +352,9 @@ MURO_TEMPLATE = BASE_TEMPLATE + """
         <h2 class="text-2xl font-bold text-gray-800">Muro de Necesidades y Apoyos</h2>
     </div>
     <div class="flex items-center gap-2">
+    <div class="card-contador">
+    <p>👥 Estudiantes registrados: <strong>{{ total_estudiantes }}</strong></p>
+</div>
         <!-- Botón de Instalación PWA -->
         <button id="btn-instalar" onclick="abrirModalInstalacion()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-semibold shadow transition-all text-sm">
             📱 Instalar App
@@ -637,7 +640,7 @@ def save_subscription():
 def muro():
     if 'usuario_id' not in session:
         return redirect(url_for('registro'))
-    
+    total_estudiantes = Usuario.query.count()
     # Limpieza automática de publicaciones con más de 3 días sin ser completadas
     limite_tiempo = datetime.now() - timedelta(days=3)  # 3 días en minutos
     try:

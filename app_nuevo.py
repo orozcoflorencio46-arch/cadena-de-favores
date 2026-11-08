@@ -349,12 +349,13 @@ COMPROMISO_TEMPLATE = BASE_TEMPLATE + """
 MURO_TEMPLATE = BASE_TEMPLATE + """
 <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6 bg-white p-4 rounded-xl shadow-md">
     <div>
+    <div style="display: inline-flex; align-items: center; gap: 8px;">
+    👥 Estudiantes registrados: <strong>{{ total_estudiantes }}</strong>
+</div>
         <h2 class="text-2xl font-bold text-gray-800">Muro de Necesidades y Apoyos</h2>
     </div>
     <div class="flex items-center gap-2">
-    <div class="card-contador">
-    <p>👥 Estudiantes registrados: <strong>{{ total_estudiantes }}</strong></p>
-</div>
+    
         <!-- Botón de Instalación PWA -->
         <button id="btn-instalar" onclick="abrirModalInstalacion()" class="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-semibold shadow transition-all text-sm">
             📱 Instalar App

@@ -638,7 +638,7 @@ def muro():
         return redirect(url_for('registro'))
     
     # Limpieza automática de publicaciones con más de 3 días sin ser completadas
-    limite_tiempo = datetime.now() - timedelta(minutoes=1)  # 3 días en minutos
+    limite_tiempo = datetime.now() - timedelta(minutes=1)  # 3 días en minutos
     try:
         vencidas = Publicacion.query.filter(
          Publicacion.fecha_creacion < limite_tiempo,

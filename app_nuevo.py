@@ -313,7 +313,7 @@ REGISTRO_TEMPLATE = BASE_TEMPLATE + """
         </div>
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700">Número de Carnet</label>
-            <input type="text" name="carnet" required maxlength="7" pattern="[0-9]{7}" title="Debe tener 7 dígitos"
+            <input type="text" name="carnet" required maxlength="7" pattern="[0-9]{7}" title="ERROR ".
                    class="w-full border p-2 rounded mt-1" placeholder="Ej. 2023123">
         </div>
         <button type="submit" 
